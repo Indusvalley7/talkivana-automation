@@ -1,0 +1,130 @@
+from __future__ import annotations
+
+import json
+from datetime import date
+
+from .config import AppConfig, Playlist, load_guardrails
+from .gemini import GeminiClient
+from .models import (
+    CONTENT_PACK_JSON_SCHEMA,
+    QA_JSON_SCHEMA,
+    ContentPackRecord,
+    build_pack_record,
+    recent_vocabulary,
+    validate_content_pack,
+)
+
+
+class ContentPackGenerator:
+    def __init__(self, config: AppConfig, client: GeminiClient) -> None:
+        self.config = config
+        self.client = client
+        self.guardrails = load_guardrails()
+
+    def create(
+        self,
+        *,
+        playlist: Playlist,
+        history: list[ContentPackRecord],
+        revision: int = 1,
+        replacement_for: int | None = None,
+        revision_feedback: str = "",
+        today: date | None = None,
+    ) -> ContentPackRecord:
+        channel = self.config.raw["channel"]
+        content = self.config.raw["content"]
+        source = str(channel["source_language"])
+        level = str(channel["level"])
+        words = int(content["words_per_short"])
+        turns = int(content["dialogue_turns_per_long"])
+        used = recent_vocabulary(history, playlist.target_language)
+        ordinal = (today or date.today()).toordinal() * 2
+        topics = [
+            playlist.topics[(ordinal + offset + revision - 1) % len(playlist.topics)]
+            for offset in range(2)
+        ]
+        feedback = (
+            "\nThe owner requested this revision. Apply it exactly when it is safe and compatible "
+            f"with the guardrails: {revision_feedback}"
+            if revision_feedback
+            else ""
+        )
+        prompt = f"""
+Create one Talkivana daily content pack for an approval-gated language channel.
+
+Non-negotiable configuration:
+- Explanation language: {source}
+- Learning language: {playlist.target_language}
+- Variety: {playlist.variety}
+- Level: {level}
+- General-audience and family-safe; not specifically directed at children
+- Exactly two Shorts: asset IDs short-1 and short-2
+- Exactly two long videos: asset IDs long-1 and long-2
+- Pair short-1 with long-1 and short-2 with long-2
+- Exactly {words} useful words or verbs in each Short
+- Exactly {turns} alternating A/B conversation turns in each long video
+- Topics, in pair order: {json.dumps(topics, ensure_ascii=False)}
+- Pronunciation: simplified English spelling, never IPA
+- Every linked Short vocabulary item must appear verbatim in its long video's German dialogue
+- Each dialogue turn is spoken later as English once, German once, then German repeated once
+- After the teaching sequence, replay the complete coherent conversation in German only, once
+- Each conversation must progress naturally so the final German-only pass works as a single scene
+- Shorts contain vocabulary and English meaning only; long videos contain conversations/sentences
+- Recently used German terms to avoid: {json.dumps(used, ensure_ascii=False)}
+{feedback}
+
+Make the two scenarios materially different. Use original examples and practical beginner situations.
+Do not add subtitles, grammar lectures, calls to subscribe, or claims of fluency.
+Follow every repository guardrail below and return only the requested structured object.
+
+{self.guardrails}
+""".strip()
+        pack = self.client.generate_json(
+            model=str(self.config.raw["models"]["text"]),
+            prompt=prompt,
+            schema=CONTENT_PACK_JSON_SCHEMA,
+        )
+        self._validate(pack, playlist)
+
+        qa_prompt = f"""
+Act as a strict Standard German bilingual editor and educational-quality reviewer.
+Check every English/German meaning, simplified pronunciation, dialogue, cross-link, spelling,
+capitalisation, grammatical gender, verb form, register, originality, family safety, and absolute-
+beginner suitability. No dialects are allowed. The Shorts must be vocabulary-only; long videos
+must be conversations/sentences. Preserve exactly two of each asset and the configured counts.
+
+If any item is doubtful, replace it with simpler Standard German. Always return a complete
+corrected_pack. approved describes the corrected pack, not the original.
+
+Guardrails:
+{self.guardrails}
+
+Pack:
+{json.dumps(pack, ensure_ascii=False, indent=2)}
+""".strip()
+        qa = self.client.generate_json(
+            model=str(self.config.raw["models"]["text"]),
+            prompt=qa_prompt,
+            schema=QA_JSON_SCHEMA,
+        )
+        corrected = qa.get("corrected_pack")
+        if not isinstance(corrected, dict):
+            raise ValueError("QA response did not contain corrected_pack.")
+        self._validate(corrected, playlist)
+        return build_pack_record(
+            corrected,
+            revision=revision,
+            qa_problems=[str(item) for item in qa.get("problems", [])],
+            replacement_for=replacement_for,
+            today=today,
+        )
+
+    def _validate(self, pack: dict, playlist: Playlist) -> None:
+        validate_content_pack(
+            pack,
+            source_language=str(self.config.raw["channel"]["source_language"]),
+            target_language=playlist.target_language,
+            language_variety=playlist.variety,
+            words_per_short=int(self.config.raw["content"]["words_per_short"]),
+            dialogue_turns_per_long=int(self.config.raw["content"]["dialogue_turns_per_long"]),
+        )

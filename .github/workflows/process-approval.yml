@@ -1,0 +1,104 @@
+name: Talkivana — approvals and production
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: talkivana-approval-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  command_gate:
+    name: Parent agent — authenticate and classify command
+    if: ${{ !github.event.issue.pull_request }}
+    runs-on: ubuntu-latest
+    outputs:
+      decision: ${{ steps.classify.outputs.decision }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e .
+      - id: classify
+        name: Classify the first non-empty line
+        run: |
+          DECISION="$(python -m language_video_automation classify-event --event "$GITHUB_EVENT_PATH")"
+          echo "decision=$DECISION" >> "$GITHUB_OUTPUT"
+          echo "Command category: $DECISION"
+
+  production:
+    name: Voice + slides + assembly + technical QA
+    needs: command_gate
+    if: ${{ contains(fromJSON('["approve_content","revise_content","retry_voice","retry_slides","retry_video","reject"]'), needs.command_gate.outputs.decision) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      HF_HUB_DISABLE_XET: "1"
+      PKUSEG_HOME: ${{ github.workspace }}/.cache/pkuseg
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Cache pinned Chatterbox model files
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/huggingface
+            .cache/pkuseg
+          key: talkivana-chatterbox-v3-65b1843
+      - run: python -m pip install --disable-pip-version-check -e ".[tts]"
+      - name: Install FFmpeg and Talkivana fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-noto-core fonts-noto-cjk
+      - name: Execute the stage-appropriate guarded operation
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: python -m language_video_automation process-approval --event "$GITHUB_EVENT_PATH" --repo "$GITHUB_REPOSITORY"
+      - name: Attach 30-second convenience previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: talkivana-30-second-previews-${{ github.event.issue.number }}
+          path: build/review/**/*-preview.mp4
+          if-no-files-found: ignore
+          retention-days: 3
+          compression-level: 6
+
+  final_schedule:
+    name: Final approval gate → schedule exact private files
+    needs: command_gate
+    if: ${{ needs.command_gate.outputs.decision == 'approve_video' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e .
+      - name: Schedule only the four previously reviewed private uploads
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: python -m language_video_automation process-approval --event "$GITHUB_EVENT_PATH" --repo "$GITHUB_REPOSITORY"

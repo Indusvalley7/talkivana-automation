@@ -1,0 +1,651 @@
+from __future__ import annotations
+
+import json
+import os
+import shutil
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
+
+from .analytics import current_timing_assignments
+from .approvals import ApprovalCommand, Decision, is_authorized, parse_approval_command
+from .config import AppConfig, ConfigurationError, load_config, project_root, validate_production_config
+from .gemini import GeminiClient
+from .generator import ContentPackGenerator
+from .github_api import (
+    GitHubClient,
+    Issue,
+    format_issue_body,
+    parse_pack_record,
+    read_upload_manifest,
+    write_upload_manifest,
+)
+from .models import ContentPackRecord, validate_content_pack, validate_record_integrity
+from .renderer import (
+    ChatterboxSpeechProvider,
+    GeminiSpeechProvider,
+    MacSpeechProvider,
+    PackRenderResult,
+    render_asset,
+    render_pack,
+)
+from .scheduling import build_timing_plan, next_publish_time
+from .youtube import YouTubeUploader
+
+
+class PipelineError(RuntimeError):
+    pass
+
+
+def classify_event(event_path: Path) -> str:
+    event = json.loads(event_path.read_text(encoding="utf-8"))
+    command = parse_approval_command(str(event.get("comment", {}).get("body", "")))
+    return command.decision.value
+
+
+def create_daily_draft(*, repository: str, force: bool = False) -> Issue | None:
+    config = load_config()
+    if not config.enabled:
+        print("Production lock is active: system.enabled is false. No content pack was generated.")
+        return None
+    validate_production_config(config)
+    github = GitHubClient(repository)
+    github.ensure_labels()
+    issues = github.list_issues(state="all", labels=["talkivana"])
+    history = _history_from_issues(issues)
+    today = date.today()
+    if not force and any(
+        record.created_date == today.isoformat() and record.replacement_for is None
+        for record in history
+    ):
+        print("A primary content pack already exists for today.")
+        return None
+    pending = [
+        issue for issue in issues
+        if issue.state == "open"
+        and {
+            "pack-awaiting-content", "pack-producing", "pack-awaiting-video",
+            "pack-setup-blocked", "pack-failed",
+        }.intersection(issue.labels)
+    ]
+    maximum = int(config.raw["system"]["max_pending_packs"])
+    if len(pending) >= maximum and not force:
+        print(f"Pending-pack guard reached ({len(pending)}/{maximum}); generation paused.")
+        return None
+    playlist = config.choose_playlist(today.toordinal())
+    record = _generate_record(config=config, playlist=playlist, history=history, today=today)
+    issue = _create_pack_issue(github, config, record)
+    print(f"Created content approval Issue #{issue.number}: {issue.html_url}")
+    return issue
+
+
+def process_approval_event(*, event_path: Path, repository: str) -> None:
+    event = json.loads(event_path.read_text(encoding="utf-8"))
+    command = parse_approval_command(str(event.get("comment", {}).get("body", "")))
+    if command.decision is Decision.IGNORE:
+        print("Comment is not a Talkivana command; ignoring.")
+        return
+    config = load_config()
+    issue_number = int(event["issue"]["number"])
+    sender = str(event.get("sender", {}).get("login", ""))
+    github = GitHubClient(repository)
+    issue = github.get_issue(issue_number)
+    if not is_authorized(sender, config.approver_login, repository.split("/", 1)[0]):
+        github.comment(issue_number, f"Command ignored: `{sender}` is not the configured approver.")
+        return
+    if not config.enabled:
+        github.comment(issue_number, "Production is disabled. No command was executed.")
+        return
+    validate_production_config(config)
+    record = parse_pack_record(issue.body)
+    _validate_record_again(record, config)
+
+    if "pack-awaiting-content" in issue.labels:
+        _process_content_stage(github, config, issue, record, command)
+        return
+    if "pack-awaiting-video" in issue.labels:
+        _process_video_stage(github, config, issue, record, command)
+        return
+    print(f"Issue #{issue.number} is not at an approval gate; stale command ignored.")
+
+
+def _process_content_stage(
+    github: GitHubClient,
+    config: AppConfig,
+    issue: Issue,
+    record: ContentPackRecord,
+    command: ApprovalCommand,
+) -> None:
+    if command.decision is Decision.REVISE_CONTENT:
+        _revise_content(github, config, issue, record, command.reason)
+    elif command.decision is Decision.REJECT:
+        github.update_issue(issue.number, labels=["talkivana", "pack-rejected"], state="closed")
+        github.comment(issue.number, "Content pack rejected. Nothing was rendered or uploaded.")
+    elif command.decision is Decision.APPROVE_CONTENT:
+        _produce_private_previews(github, config, issue, record, replace_existing=False)
+    else:
+        github.comment(issue.number, "That command is not valid at the content-approval stage.")
+
+
+def _process_video_stage(
+    github: GitHubClient,
+    config: AppConfig,
+    issue: Issue,
+    record: ContentPackRecord,
+    command: ApprovalCommand,
+) -> None:
+    if command.decision is Decision.APPROVE_VIDEO:
+        _schedule_approved_pack(github, config, issue, record)
+    elif command.decision in {Decision.RETRY_VOICE, Decision.RETRY_SLIDES, Decision.RETRY_VIDEO}:
+        # A complete deterministic rerender prevents a corrected component from becoming
+        # desynchronised with the approved audio/visual timeline.
+        github.comment(
+            issue.number,
+            f"{command.decision.value.replace('_', ' ').title()} accepted"
+            + (f": {command.reason}" if command.reason else "")
+            + ". The complete pack will be rebuilt so voice, visuals, and timing remain synchronized.",
+        )
+        _produce_private_previews(github, config, issue, record, replace_existing=True)
+    elif command.decision is Decision.REJECT:
+        manifest = read_upload_manifest(issue.body)
+        manifest["rejected_at"] = datetime.now(timezone.utc).isoformat()
+        github.update_issue(
+            issue.number,
+            body=write_upload_manifest(issue.body, manifest),
+            labels=["talkivana", "pack-rejected"],
+            state="closed",
+        )
+        days = int(config.raw["approval"]["rejected_preview_retention_days"])
+        github.comment(
+            issue.number,
+            f"Final videos rejected. They remain private and will be deleted after {days} days.",
+        )
+    else:
+        github.comment(issue.number, "That command is not valid at the final-video approval stage.")
+
+
+def _generate_record(
+    *,
+    config: AppConfig,
+    playlist,
+    history: list[ContentPackRecord],
+    revision: int = 1,
+    replacement_for: int | None = None,
+    revision_feedback: str = "",
+    today: date | None = None,
+) -> ContentPackRecord:
+    client = GeminiClient(max_requests=int(config.raw["system"]["max_generation_requests_per_run"]))
+    return ContentPackGenerator(config, client).create(
+        playlist=playlist,
+        history=history,
+        revision=revision,
+        replacement_for=replacement_for,
+        revision_feedback=revision_feedback,
+        today=today,
+    )
+
+
+def _create_pack_issue(github: GitHubClient, config: AppConfig, record: ContentPackRecord) -> Issue:
+    return github.create_issue(
+        title=f"Talkivana content approval: {record.content['pack_title']} [{record.pack_id}]"[:250],
+        body=format_issue_body(record),
+        labels=["talkivana", "pack-awaiting-content"],
+        assignee=config.approver_login,
+    )
+
+
+def _revise_content(
+    github: GitHubClient,
+    config: AppConfig,
+    issue: Issue,
+    record: ContentPackRecord,
+    reason: str,
+) -> None:
+    if not reason:
+        github.comment(issue.number, "Use `REVISE CONTENT: describe the correction`.")
+        return
+    github.update_issue(issue.number, labels=["talkivana", "pack-rejected"], state="closed")
+    github.comment(issue.number, f"Revision requested: {reason}\n\nNothing was rendered or uploaded.")
+    try:
+        history = _history_from_issues(github.list_issues(state="all", labels=["talkivana"]))
+        playlist = _playlist_for_record(config, record)
+        replacement = _generate_record(
+            config=config,
+            playlist=playlist,
+            history=history,
+            revision=record.revision + 1,
+            replacement_for=issue.number,
+            revision_feedback=reason,
+            today=date.fromisoformat(record.created_date),
+        )
+        new_issue = _create_pack_issue(github, config, replacement)
+        github.comment(issue.number, f"Replacement content pack: #{new_issue.number}")
+    except Exception as exc:
+        github.update_issue(issue.number, labels=["talkivana", "pack-rejected", "pack-failed"])
+        github.comment(issue.number, f"Revision generation failed closed: `{_safe_error(exc)}`")
+        raise
+
+
+def _produce_private_previews(
+    github: GitHubClient,
+    config: AppConfig,
+    issue: Issue,
+    record: ContentPackRecord,
+    *,
+    replace_existing: bool,
+) -> None:
+    missing = _missing_secrets()
+    if missing:
+        github.update_issue(issue.number, labels=["talkivana", "pack-setup-blocked"])
+        github.comment(
+            issue.number,
+            "Content approval was accepted, but production is blocked by missing secrets: "
+            + ", ".join(f"`{name}`" for name in missing)
+            + ". Nothing was uploaded.",
+        )
+        raise PipelineError(f"Missing repository secrets: {', '.join(missing)}")
+    github.update_issue(issue.number, labels=["talkivana", "pack-producing"])
+    github.comment(
+        issue.number,
+        "Content approved. Voice preparation, visual scene preparation, assembly, and technical QA have started. "
+        "All uploads will remain private.",
+    )
+    try:
+        latest = github.get_issue(issue.number)
+        manifest = read_upload_manifest(latest.body)
+        existing_assets = dict(manifest.get("assets", {}))
+        uploader = YouTubeUploader()
+        tts_settings = config.raw["models"]["tts_settings"]
+        if bool(tts_settings.get("automatic_voice_fallback", True)):
+            raise PipelineError("Automatic voice fallback is forbidden.")
+        rendered = render_pack(
+            record=record,
+            config=config.raw,
+            speech=ChatterboxSpeechProvider(
+                model_version=str(tts_settings["model_version"]),
+                device=str(tts_settings.get("device", "auto")),
+                seed=int(tts_settings["seed"]),
+                exaggeration=float(tts_settings["exaggeration"]),
+                cfg_weight=float(tts_settings["cfg_weight"]),
+                english_reference_audio=str(tts_settings.get("english_reference_audio", "")),
+                german_reference_audio=str(tts_settings.get("german_reference_audio", "")),
+            ),
+            output_dir=project_root() / "build" / "review" / str(issue.number),
+        )
+        if replace_existing:
+            # Keep the old review copies available until the replacement render has passed
+            # technical QA. Only then remove them and begin the new idempotent upload set.
+            for value in existing_assets.values():
+                video_id = str(value.get("video_id", ""))
+                if video_id:
+                    uploader.delete_private(video_id)
+            existing_assets = {}
+            manifest = {
+                "pack_id": record.pack_id,
+                "assets": {},
+                "preview_workflow_run": os.environ.get("GITHUB_RUN_ID", ""),
+            }
+            latest = github.get_issue(issue.number)
+            github.update_issue(issue.number, body=write_upload_manifest(latest.body, manifest))
+        youtube = config.raw["youtube"]
+        asset_content = _assets_by_id(record)
+        for result in rendered.assets:
+            if result.asset_id in existing_assets:
+                continue
+            content = asset_content[result.asset_id]
+            description = (
+                f"{content['description']}\n\n{config.raw['channel']['description_footer']}\n"
+                f"Pack ID: {record.pack_id}\nAsset ID: {result.asset_id}"
+            )
+            tags = list(dict.fromkeys([*content.get("tags", []), *youtube.get("tags", [])]))
+            uploaded = uploader.upload_private(
+                video_path=result.video_path,
+                title=str(content["title"]),
+                description=description,
+                tags=tags,
+                category_id=str(youtube["category_id"]),
+                default_language=str(youtube["default_language"]),
+                made_for_kids=bool(youtube["made_for_kids"]),
+                contains_synthetic_media=bool(youtube["contains_synthetic_media"]),
+            )
+            existing_assets[result.asset_id] = {
+                "asset_id": result.asset_id,
+                "kind": result.kind,
+                "title": result.title,
+                "video_id": uploaded.video_id,
+                "url": uploaded.url,
+                "duration_seconds": round(result.duration_seconds, 3),
+                "uploaded_at": datetime.now(timezone.utc).isoformat(),
+            }
+            manifest = {
+                "pack_id": record.pack_id,
+                "assets": existing_assets,
+                "preview_workflow_run": os.environ.get("GITHUB_RUN_ID", ""),
+            }
+            latest = github.get_issue(issue.number)
+            github.update_issue(issue.number, body=write_upload_manifest(latest.body, manifest))
+
+        if set(existing_assets) != {"short-1", "short-2", "long-1", "long-2"}:
+            raise PipelineError("Private upload manifest does not contain all four assets.")
+        github.update_issue(issue.number, labels=["talkivana", "pack-awaiting-video"])
+        links = "\n".join(
+            f"- **{asset_id} — {value['title']}:** {value['url']}"
+            for asset_id, value in sorted(existing_assets.items())
+        )
+        run_url = (
+            f"https://github.com/{github.repository}/actions/runs/{os.environ.get('GITHUB_RUN_ID')}"
+            if os.environ.get("GITHUB_RUN_ID")
+            else "the current Actions run"
+        )
+        github.comment(
+            issue.number,
+            "## Final-video approval required\n\n"
+            "Watch every full private video while signed into the Talkivana channel account:\n\n"
+            f"{links}\n\n"
+            f"Thirty-second convenience clips are attached to [{run_url}]({run_url}) as a short-lived artifact.\n\n"
+            "Reply with one command:\n\n"
+            "- `APPROVE VIDEO`\n"
+            "- `RETRY VOICE: optional correction`\n"
+            "- `RETRY VISUALS: optional correction`\n"
+            "- `RETRY VIDEO: optional correction`\n"
+            "- `REJECT: optional reason`\n\n"
+            "Nothing is scheduled or public yet.",
+        )
+    except Exception as exc:
+        latest = github.get_issue(issue.number)
+        labels = ["talkivana", "pack-failed"]
+        if read_upload_manifest(latest.body).get("assets"):
+            labels.append("pack-awaiting-video")
+        github.update_issue(issue.number, labels=labels)
+        github.comment(issue.number, f"Production failed closed: `{_safe_error(exc)}`")
+        raise
+
+
+def _schedule_approved_pack(
+    github: GitHubClient,
+    config: AppConfig,
+    issue: Issue,
+    record: ContentPackRecord,
+) -> None:
+    manifest = read_upload_manifest(issue.body)
+    assets = manifest.get("assets", {})
+    if set(assets) != {"short-1", "short-2", "long-1", "long-2"}:
+        raise PipelineError("Final approval cannot run without four private-video IDs.")
+    launch_text = str(config.raw["timing_agent"].get("launch_date", "")).strip()
+    launch = date.fromisoformat(launch_text) if launch_text else date.fromisoformat(record.created_date)
+    on_date = date.today()
+    timing = config.raw["timing_agent"]
+    plan = build_timing_plan(
+        launch_date=launch,
+        on_date=on_date,
+        slots=list(config.raw["youtube"]["seed_publish_slots_local"]),
+        samples=[],
+        stage_1_days=int(timing["stage_1_days"]),
+        stage_2_days=int(timing["stage_2_days"]),
+        stage_2_exploration_ratio=float(timing["stage_2_exploration_ratio"]),
+        stage_3_exploration_ratio=float(timing["stage_3_exploration_ratio"]),
+        minimum_samples=int(timing["minimum_samples_per_format_slot"]),
+    )
+    persisted = current_timing_assignments(github)
+    if persisted:
+        slot_by_asset, timing_explanation = persisted
+    else:
+        slot_by_asset = dict(plan.assignments)
+        timing_explanation = plan.explanation
+    buffer_days = int(config.raw["approval"]["rolling_buffer_days"])
+    lead_days = int(config.raw["content"]["vocabulary_lead_days"])
+    short_date = _next_available_short_date(github, record, buffer_days)
+    long_date = short_date + timedelta(days=lead_days)
+    seed_slots = list(config.raw["youtube"]["seed_publish_slots_local"])
+    reservations = _reserved_slots_by_date(github)
+    actual_slots: dict[str, str] = {}
+    for target_date, asset_ids in (
+        (short_date, ("short-1", "short-2")),
+        (long_date, ("long-1", "long-2")),
+    ):
+        occupied = set(reservations.get(target_date, set()))
+        for asset_id in asset_ids:
+            preferred = slot_by_asset[asset_id]
+            available = [slot for slot in seed_slots if slot not in occupied]
+            if not available:
+                raise PipelineError(f"No unoccupied Talkivana slot remains on {target_date}.")
+            chosen = preferred if preferred in available else available[0]
+            actual_slots[asset_id] = chosen
+            occupied.add(chosen)
+        reservations[target_date] = occupied
+    uploader = YouTubeUploader()
+    youtube = config.raw["youtube"]
+    playlist = _playlist_for_record(config, record)
+    scheduled_lines: list[str] = []
+    for asset_id in ("short-1", "short-2", "long-1", "long-2"):
+        value = assets[asset_id]
+        if value.get("scheduled_at"):
+            scheduled_lines.append(
+                f"- {asset_id}: `{value['scheduled_at']}` — {value['url']} (already confirmed)"
+            )
+            continue
+        target_date = short_date if asset_id.startswith("short") else long_date
+        publish_at = next_publish_time(
+            timezone_name=str(youtube["timezone"]),
+            local_time=actual_slots[asset_id],
+            minimum_lead_hours=int(youtube["minimum_lead_hours"]),
+            not_before_date=target_date,
+        )
+        uploader.schedule_existing(
+            video_id=str(value["video_id"]),
+            publish_at=publish_at,
+            made_for_kids=bool(youtube["made_for_kids"]),
+            contains_synthetic_media=bool(youtube["contains_synthetic_media"]),
+        )
+        uploader.add_to_playlist(
+            video_id=str(value["video_id"]),
+            playlist_id=playlist.youtube_playlist_id,
+        )
+        value["scheduled_at"] = publish_at.isoformat()
+        value["slot_local"] = actual_slots[asset_id]
+        scheduled_lines.append(f"- {asset_id}: `{publish_at.isoformat()}` — {value['url']}")
+        latest = github.get_issue(issue.number)
+        manifest["assets"] = assets
+        github.update_issue(issue.number, body=write_upload_manifest(latest.body, manifest))
+    github.update_issue(issue.number, labels=["talkivana", "pack-scheduled"], state="closed")
+    github.comment(
+        issue.number,
+        "## Approved and scheduled\n\n"
+        + "\n".join(scheduled_lines)
+        + f"\n\nTiming agent: {timing_explanation}\n"
+        "The linked vocabulary Shorts are scheduled one day before their conversation lessons.",
+    )
+
+
+def cleanup_rejected_previews(*, repository: str) -> int:
+    config = load_config(require_enabled=True)
+    cutoff = datetime.now(timezone.utc) - timedelta(
+        days=int(config.raw["approval"]["rejected_preview_retention_days"])
+    )
+    github = GitHubClient(repository)
+    uploader = YouTubeUploader()
+    deleted = 0
+    for issue in github.list_issues(state="closed", labels=["talkivana", "pack-rejected"]):
+        manifest = read_upload_manifest(issue.body)
+        rejected_at = str(manifest.get("rejected_at", ""))
+        if not rejected_at or manifest.get("deleted_at"):
+            continue
+        when = datetime.fromisoformat(rejected_at.replace("Z", "+00:00"))
+        if when > cutoff:
+            continue
+        for value in manifest.get("assets", {}).values():
+            if value.get("video_id"):
+                uploader.delete_private(str(value["video_id"]))
+                deleted += 1
+        manifest["deleted_at"] = datetime.now(timezone.utc).isoformat()
+        github.update_issue(issue.number, body=write_upload_manifest(issue.body, manifest))
+        github.comment(issue.number, "Expired rejected private previews were deleted automatically.")
+    return deleted
+
+
+def _assets_by_id(record: ContentPackRecord) -> dict[str, dict[str, Any]]:
+    return {
+        str(asset["asset_id"]): asset
+        for collection in (record.content["shorts"], record.content["long_videos"])
+        for asset in collection
+    }
+
+
+def _next_available_short_date(
+    github: GitHubClient,
+    record: ContentPackRecord,
+    buffer_days: int,
+) -> date:
+    candidate = max(
+        date.today() + timedelta(days=buffer_days),
+        date.fromisoformat(record.created_date) + timedelta(days=buffer_days),
+    )
+    used: set[date] = set()
+    for other in github.list_issues(state="closed", labels=["talkivana", "pack-scheduled"]):
+        for asset_id, asset in read_upload_manifest(other.body).get("assets", {}).items():
+            if not str(asset_id).startswith("short") or not asset.get("scheduled_at"):
+                continue
+            used.add(datetime.fromisoformat(str(asset["scheduled_at"]).replace("Z", "+00:00")).date())
+    while candidate in used:
+        candidate += timedelta(days=1)
+    return candidate
+
+
+def _reserved_slots_by_date(github: GitHubClient) -> dict[date, set[str]]:
+    reservations: dict[date, set[str]] = {}
+    for other in github.list_issues(state="closed", labels=["talkivana", "pack-scheduled"]):
+        for asset in read_upload_manifest(other.body).get("assets", {}).values():
+            scheduled = str(asset.get("scheduled_at", ""))
+            slot = str(asset.get("slot_local", ""))
+            if not scheduled or not slot:
+                continue
+            day = datetime.fromisoformat(scheduled.replace("Z", "+00:00")).date()
+            reservations.setdefault(day, set()).add(slot)
+    return reservations
+
+
+def _playlist_for_record(config: AppConfig, record: ContentPackRecord):
+    target = str(record.content["target_language"])
+    try:
+        return next(
+            item for item in config.active_playlists
+            if item.target_language.casefold() == target.casefold()
+        )
+    except StopIteration as exc:
+        raise ConfigurationError(f"No enabled playlist matches {target!r}.") from exc
+
+
+def _history_from_issues(issues: list[Issue]) -> list[ContentPackRecord]:
+    records: list[ContentPackRecord] = []
+    for issue in issues:
+        try:
+            records.append(parse_pack_record(issue.body))
+        except Exception:
+            continue
+    return records
+
+
+def _validate_record_again(record: ContentPackRecord, config: AppConfig) -> None:
+    validate_record_integrity(record)
+    playlist = _playlist_for_record(config, record)
+    validate_content_pack(
+        record.content,
+        source_language=str(config.raw["channel"]["source_language"]),
+        target_language=playlist.target_language,
+        language_variety=playlist.variety,
+        words_per_short=int(config.raw["content"]["words_per_short"]),
+        dialogue_turns_per_long=int(config.raw["content"]["dialogue_turns_per_long"]),
+    )
+
+
+def _missing_secrets() -> list[str]:
+    names = (
+        "GEMINI_API_KEY", "YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN",
+    )
+    return [name for name in names if not os.environ.get(name)]
+
+
+def _safe_error(exc: Exception) -> str:
+    message = f"{type(exc).__name__}: {exc}".replace("`", "'")
+    for name in (
+        "GEMINI_API_KEY", "YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN",
+    ):
+        value = os.environ.get(name)
+        if value:
+            message = message.replace(value, "[REDACTED]")
+    return " ".join(message.split())[:800]
+
+
+def run_preflight(*, mode: str) -> list[str]:
+    config = load_config()
+    problems: list[str] = []
+    try:
+        validate_production_config(config)
+    except ConfigurationError as exc:
+        problems.append(str(exc))
+    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+        problems.append("ffmpeg and ffprobe are required")
+    if mode == "github":
+        problems.extend(f"missing secret: {name}" for name in _missing_secrets())
+        if not os.environ.get("GITHUB_TOKEN") and not os.environ.get("GH_TOKEN"):
+            problems.append("missing GitHub Actions token")
+    return problems
+
+
+def render_demo(*, output_dir: Path, asset_id: str = "") -> PackRenderResult:
+    fixture = project_root() / "tests" / "fixtures" / "sample_pack.json"
+    record = ContentPackRecord.from_dict(json.loads(fixture.read_text(encoding="utf-8")))
+    config = load_config().raw
+    speech = MacSpeechProvider()
+    if asset_id:
+        for kind, collection in (("short", record.content["shorts"]), ("long", record.content["long_videos"])):
+            for asset in collection:
+                if str(asset["asset_id"]) == asset_id:
+                    cache: dict[str, tuple[Path, float]] = {}
+                    result = render_asset(
+                        record=record,
+                        asset=asset,
+                        kind=kind,
+                        config=config,
+                        speech=speech,
+                        output_dir=output_dir / asset_id,
+                        audio_cache=cache,
+                    )
+                    return PackRenderResult((result,), len(cache))
+        raise PipelineError(f"Unknown demo asset: {asset_id}")
+    return render_pack(
+        record=record,
+        config=config,
+        speech=speech,
+        output_dir=output_dir,
+    )
+
+
+def render_chatterbox_demo(*, output_dir: Path, asset_id: str = "long-1") -> PackRenderResult:
+    fixture = project_root() / "tests" / "fixtures" / "sample_pack.json"
+    record = ContentPackRecord.from_dict(json.loads(fixture.read_text(encoding="utf-8")))
+    config = load_config().raw
+    settings = config["models"]["tts_settings"]
+    speech = ChatterboxSpeechProvider(
+        model_version=str(settings["model_version"]),
+        device=str(settings.get("device", "auto")),
+        seed=int(settings["seed"]),
+        exaggeration=float(settings["exaggeration"]),
+        cfg_weight=float(settings["cfg_weight"]),
+        english_reference_audio=str(settings.get("english_reference_audio", "")),
+        german_reference_audio=str(settings.get("german_reference_audio", "")),
+    )
+    for kind, collection in (("short", record.content["shorts"]), ("long", record.content["long_videos"])):
+        for asset in collection:
+            if str(asset["asset_id"]) == asset_id:
+                result = render_asset(
+                    record=record,
+                    asset=asset,
+                    kind=kind,
+                    config=config,
+                    speech=speech,
+                    output_dir=output_dir / asset_id,
+                    audio_cache={},
+                )
+                return PackRenderResult((result,), speech.request_count)
+    raise PipelineError(f"Unknown Chatterbox demo asset: {asset_id}")

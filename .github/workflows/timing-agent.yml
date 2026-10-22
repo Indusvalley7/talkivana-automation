@@ -1,0 +1,48 @@
+name: Talkivana — audience timing agent
+
+on:
+  schedule:
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+    inputs:
+      weekly_report:
+        description: "Post a human-readable weekly report"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: talkivana-timing-agent
+  cancel-in-progress: false
+
+jobs:
+  analytics:
+    name: Customer-online analysis — collect equal-window evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e .
+      - name: Collect metrics and apply the 30/60-day policy
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          REPORT=""
+          if [ "$(date -u +%u)" = "1" ] || [ "${{ inputs.weekly_report }}" = "true" ]; then
+            REPORT="--report"
+          fi
+          python -m language_video_automation timing-agent --repo "$GITHUB_REPOSITORY" $REPORT
+

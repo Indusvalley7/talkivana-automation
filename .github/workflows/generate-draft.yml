@@ -1,0 +1,70 @@
+name: Talkivana — content generation
+
+on:
+  schedule:
+    - cron: "17 1 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Bypass today's deduplication and pending-pack cap"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: talkivana-daily-content
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Parent agent — safety preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e .
+      - name: Validate configuration without enabling publication
+        run: python -c "from language_video_automation.config import load_config; load_config(); print('Configuration schema valid')"
+
+  content:
+    name: Content generation + Standard German QA
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e .
+      - name: Generate two Shorts and two linked conversations
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ inputs.force }}" = "true" ]; then
+            python -m language_video_automation draft --repo "$GITHUB_REPOSITORY" --force
+          else
+            python -m language_video_automation draft --repo "$GITHUB_REPOSITORY"
+          fi
+
+  approval_gate:
+    name: Content approval gate — waiting occurs in GitHub Issue
+    needs: content
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "No runner waits. The next workflow starts only after an authorized Issue command."
+

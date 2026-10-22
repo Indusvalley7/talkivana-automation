@@ -1,0 +1,71 @@
+name: Talkivana — one Chatterbox sample
+
+on:
+  workflow_dispatch:
+    inputs:
+      asset:
+        description: Single sample to render
+        required: true
+        default: long-1
+        type: choice
+        options:
+          - long-1
+          - short-1
+
+permissions:
+  contents: read
+
+env:
+  HF_HUB_DISABLE_XET: "1"
+  PKUSEG_HOME: ${{ github.workspace }}/.cache/pkuseg
+
+concurrency:
+  group: talkivana-chatterbox-sample
+  cancel-in-progress: true
+
+jobs:
+  sample:
+    name: Pinned Chatterbox voice → one review video
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Cache pinned Chatterbox model files
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/huggingface
+            .cache/pkuseg
+          key: talkivana-chatterbox-v3-65b1843
+
+      - name: Install renderer and pinned open-source TTS
+        run: python -m pip install --disable-pip-version-check -e ".[tts]"
+
+      - name: Install FFmpeg and Talkivana fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-noto-core fonts-noto-cjk
+
+      - name: Render exactly one sample
+        run: >-
+          python -m language_video_automation render-chatterbox-demo
+          --asset "${{ inputs.asset }}"
+          --output build/chatterbox-sample
+
+      - name: Upload only the sample video and its 30-second preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: talkivana-chatterbox-${{ inputs.asset }}
+          path: |
+            build/chatterbox-sample/${{ inputs.asset }}/*.mp4
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0

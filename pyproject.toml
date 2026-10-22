@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "language-video-automation"
+version = "0.2.0"
+description = "Talkivana two-gate German video automation and timing agent"
+requires-python = ">=3.11"
+dependencies = [
+  "google-api-python-client==2.201.0",
+  "google-auth==2.62.0",
+  "google-auth-oauthlib==1.5.0",
+  "google-genai==2.31.0",
+  "Pillow==12.3.0"
+]
+
+[project.optional-dependencies]
+tts = [
+  "chatterbox-tts @ git+https://github.com/resemble-ai/chatterbox.git@65b1843"
+]
+
+[project.scripts]
+language-video = "language_video_automation.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

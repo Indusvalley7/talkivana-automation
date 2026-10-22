@@ -1,0 +1,196 @@
+{
+  "system": {
+    "enabled": false,
+    "schema_version": 2,
+    "max_generation_requests_per_run": 8,
+    "max_tts_requests_per_pack": 180,
+    "tts_min_interval_seconds": 0,
+    "max_pending_packs": 7,
+    "actions_monthly_minute_soft_limit": 1600
+  },
+  "approval": {
+    "approver_login": "Indusvalley7",
+    "quick_preview_seconds": 30,
+    "rejected_preview_retention_days": 14,
+    "rolling_buffer_days": 7
+  },
+  "channel": {
+    "name": "Talkivana",
+    "tagline": "Real Conversations. Clear Language.",
+    "description_footer": "Talkivana — Real Conversations. Clear Language. This original educational lesson uses synthetic narration and was reviewed before publication.",
+    "source_language": "English",
+    "level": "absolute beginner",
+    "audience": "general audience, family-safe, not specifically directed at children",
+    "target_regions": [
+      "India",
+      "Germany",
+      "worldwide English-speaking countries"
+    ]
+  },
+  "playlists": [
+    {
+      "enabled": true,
+      "target_language": "German",
+      "variety": "Standard German used in Germany; no dialects",
+      "youtube_playlist_id": "",
+      "topics": [
+        "greetings and introductions",
+        "at a café",
+        "shopping for groceries",
+        "public transport",
+        "asking for directions",
+        "home and daily routines",
+        "workplace basics",
+        "school and study",
+        "appointments and schedules",
+        "weather and clothing",
+        "restaurants and ordering food",
+        "neighbours and community"
+      ]
+    }
+  ],
+  "content": {
+    "shorts_per_day": 2,
+    "long_videos_per_day": 2,
+    "words_per_short": 3,
+    "dialogue_turns_per_long": 12,
+    "vocabulary_lead_days": 1,
+    "pronunciation_style": "simplified English spelling",
+    "spoken_sequence": [
+      "English once",
+      "German once",
+      "German repeated once"
+    ],
+    "burned_in_subtitles": false,
+    "youtube_closed_captions": false
+  },
+  "models": {
+    "text": "gemini-3.5-flash-lite",
+    "tts_provider": "chatterbox",
+    "tts": "ResembleAI/chatterbox-multilingual-v3",
+    "voice": "talkivana-default-v1",
+    "tts_settings": {
+      "model_version": "v3",
+      "device": "auto",
+      "seed": 271828,
+      "exaggeration": 0.65,
+      "cfg_weight": 0.35,
+      "english_reference_audio": "",
+      "german_reference_audio": "",
+      "automatic_voice_fallback": false
+    }
+  },
+  "video": {
+    "fps": 24,
+    "max_practice_pause_seconds": 6,
+    "visual_style": {
+      "status": "rotating Talkivana templates",
+      "template_order": ["teal_tutor", "berry_classroom", "midnight_gold", "sunset_navy"],
+      "templates": {
+        "teal_tutor": {
+          "background_top": "#0B716B",
+          "background_bottom": "#063B49",
+          "foreground": "#FFFFFF",
+          "card_text": "#17233C",
+          "muted": "#D9E8BE",
+          "caption": "#F9C846",
+          "panel": "#0D5F63",
+          "shape_a": "#087067",
+          "shape_b": "#39957D",
+          "line": "#74B8A8",
+          "shadow": "#173F3C",
+          "cue_bg": "#0A6764"
+        },
+        "berry_classroom": {
+          "background_top": "#8F234D",
+          "background_bottom": "#2A0B33",
+          "foreground": "#FFFFFF",
+          "card_text": "#17233C",
+          "muted": "#F0D59C",
+          "caption": "#F9C846",
+          "panel": "#672044",
+          "shape_a": "#5A1742",
+          "shape_b": "#D1576B",
+          "line": "#BA6688",
+          "shadow": "#321026",
+          "cue_bg": "#164B83"
+        },
+        "midnight_gold": {
+          "background_top": "#273747",
+          "background_bottom": "#111923",
+          "foreground": "#FFFFFF",
+          "card_text": "#17233C",
+          "muted": "#E2C888",
+          "caption": "#E8C469",
+          "panel": "#344657",
+          "shape_a": "#1A2633",
+          "shape_b": "#536A7C",
+          "line": "#748595",
+          "shadow": "#080D13",
+          "cue_bg": "#365B7B"
+        },
+        "sunset_navy": {
+          "background_top": "#C35D35",
+          "background_bottom": "#17305A",
+          "foreground": "#FFFFFF",
+          "card_text": "#17233C",
+          "muted": "#F1D6A2",
+          "caption": "#F9C846",
+          "panel": "#6C3D46",
+          "shape_a": "#A84432",
+          "shape_b": "#263E6C",
+          "line": "#D1816A",
+          "shadow": "#35283D",
+          "cue_bg": "#1D4F85"
+        }
+      }
+    },
+    "long": {
+      "width": 1920,
+      "height": 1080,
+      "minimum_seconds": 270,
+      "target_seconds": 300,
+      "maximum_seconds": 330
+    },
+    "short": {
+      "width": 1080,
+      "height": 1920,
+      "minimum_seconds": 20,
+      "target_seconds": 35,
+      "maximum_seconds": 58
+    }
+  },
+  "brand": {
+    "palette_status": "superseded by rotating video templates",
+    "primary": "#17233C",
+    "secondary": "#168C82",
+    "accent": "#F47764",
+    "background": "#FAF8F2",
+    "text": "#202631",
+    "neutral": "#E8ECEC",
+    "heading_font": "Manrope SemiBold",
+    "body_font": "Noto Sans"
+  },
+  "youtube": {
+    "category_id": "27",
+    "default_language": "en",
+    "made_for_kids": false,
+    "contains_synthetic_media": true,
+    "timezone": "Asia/Kolkata",
+    "minimum_lead_hours": 18,
+    "seed_publish_slots_local": ["07:30", "12:30", "18:00", "22:30"],
+    "minimum_slot_gap_minutes": 180,
+    "tags": ["German for beginners", "learn German", "German conversation", "Talkivana"]
+  },
+  "timing_agent": {
+    "enabled": true,
+    "launch_date": "",
+    "stage_1_days": 30,
+    "stage_2_days": 30,
+    "stage_2_exploration_ratio": 0.30,
+    "stage_3_exploration_ratio": 0.15,
+    "minimum_samples_per_format_slot": 4,
+    "evaluation_windows_hours": [24, 168],
+    "report_weekday": "Monday"
+  }
+}

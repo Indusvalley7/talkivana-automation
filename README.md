@@ -1,0 +1,67 @@
+# Talkivana Automated Language-Video System
+
+Talkivana produces two German vocabulary Shorts and two five-minute Standard German
+conversation videos per day. GitHub Actions provides the live workflow, logs, approval gates,
+private previews, publishing, cleanup, and audience-timing experiment.
+
+Production is disabled by default. No content is made public without both approvals.
+
+## Daily operating model
+
+1. Content generation creates one daily pack: two Shorts and two linked conversations.
+2. Standard German QA validates translations, spelling, simplified pronunciation, and links.
+3. A GitHub Issue requests `APPROVE CONTENT`.
+4. After approval, narration, bilingual scene rendering, video assembly, and technical QA run.
+5. Four exact completed files are uploaded privately to YouTube.
+6. The Issue contains the full private links; the Actions run contains 30-second clips.
+7. Only `APPROVE VIDEO` schedules the exact reviewed files.
+8. Shorts publish one day before their linked conversations.
+9. The timing agent collects equal-window performance samples and updates the four-slot plan.
+
+## Approval commands
+
+```text
+APPROVE CONTENT
+REVISE CONTENT: <correction>
+APPROVE VIDEO
+RETRY VOICE: <correction>
+RETRY VISUALS: <correction>
+RETRY VIDEO: <correction>
+REJECT: <reason>
+```
+
+Commands must be the first non-empty line and come from `Indusvalley7`. Casual language,
+emoji, silence, and the old one-stage `APPROVE` command do nothing.
+
+## Safety properties
+
+- `config/channel.json` keeps `system.enabled=false` until setup and dry-run checks finish.
+- Content and final-video approval are independent.
+- Uploads remain private until final approval.
+- Seven unfinished daily packs across either approval gate are allowed; the eighth pauses generation.
+- Four daily publishing slots are distinct and separated by at least three hours.
+- Rejected private previews are deleted after 14 days.
+- Full MP4 files are not stored as GitHub artifacts; only 30-second clips are retained for 3 days.
+- Every pack embeds a content hash, and every upload has an idempotent manifest.
+- Standard German is required and dialects are forbidden.
+- The general-audience channel is family-safe and is not marked made-for-kids.
+- Subtitles and closed captions are disabled.
+- Failures stop closed and are visible in the controlling Issue and Actions logs.
+
+## Local verification
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+PYTHONPATH=src python -m unittest discover -s tests -v
+PYTHONPATH=src python -m language_video_automation render-demo --output build/demo-v3
+```
+
+On macOS, the legacy demo command uses installed English and German system voices for one-off
+renderer checks. Daily automation does not use those voices. Continue with [SETUP.md](SETUP.md).
+
+Production narration uses Chatterbox Multilingual V3 pinned to the tested upstream source commit
+`65b1843`. To render
+one sample without using the Mac, run the **Talkivana — one Chatterbox sample** GitHub workflow and
+download its three-day artifact. The workflow never falls back to another voice.

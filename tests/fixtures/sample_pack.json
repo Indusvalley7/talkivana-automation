@@ -1,0 +1,100 @@
+{
+  "pack_id": "2026-10-21-german-pack-r1-d7d8ac8f1d",
+  "created_date": "2026-10-21",
+  "revision": 1,
+  "content": {
+    "pack_title": "Greetings and Café Basics",
+    "source_language": "English",
+    "target_language": "German",
+    "language_variety": "Standard German used in Germany; no dialects",
+    "level": "absolute beginner",
+    "shorts": [
+      {
+        "asset_id": "short-1",
+        "title": "Three German Greeting Words",
+        "topic": "greetings and introductions",
+        "linked_long_asset_id": "long-1",
+        "vocabulary": [
+          {"english": "hello", "german": "Hallo", "pronunciation": "HAH-loh", "part_of_speech": "greeting"},
+          {"english": "name", "german": "Name", "pronunciation": "NAH-muh", "part_of_speech": "noun"},
+          {"english": "goodbye", "german": "Tschüss", "pronunciation": "chews", "part_of_speech": "greeting"}
+        ],
+        "description": "Learn three useful Standard German words for meeting someone.",
+        "tags": ["German greetings", "German beginner", "Talkivana"]
+      },
+      {
+        "asset_id": "short-2",
+        "title": "Three German Café Words",
+        "topic": "at a café",
+        "linked_long_asset_id": "long-2",
+        "vocabulary": [
+          {"english": "water", "german": "Wasser", "pronunciation": "VAH-ser", "part_of_speech": "noun"},
+          {"english": "coffee", "german": "Kaffee", "pronunciation": "kah-FAY", "part_of_speech": "noun"},
+          {"english": "please", "german": "bitte", "pronunciation": "BIT-tuh", "part_of_speech": "adverb"}
+        ],
+        "description": "Learn three useful Standard German café words.",
+        "tags": ["German café", "German beginner", "Talkivana"]
+      }
+    ],
+    "long_videos": [
+      {
+        "asset_id": "long-1",
+        "title": "Your First German Introduction",
+        "scenario": "Two neighbours meet for the first time.",
+        "learning_objective": "Understand and repeat a simple introduction in Standard German.",
+        "linked_short_asset_id": "short-1",
+        "focus_vocabulary": [
+          {"english": "hello", "german": "Hallo", "pronunciation": "HAH-loh", "part_of_speech": "greeting"},
+          {"english": "name", "german": "Name", "pronunciation": "NAH-muh", "part_of_speech": "noun"},
+          {"english": "goodbye", "german": "Tschüss", "pronunciation": "chews", "part_of_speech": "greeting"}
+        ],
+        "dialogue": [
+          {"speaker": "A", "english": "Hello!", "german": "Hallo!", "pronunciation": "HAH-loh"},
+          {"speaker": "B", "english": "Hello! My name is Mia.", "german": "Hallo! Mein Name ist Mia.", "pronunciation": "HAH-loh, mine NAH-muh ist MEE-ah"},
+          {"speaker": "A", "english": "My name is Paul.", "german": "Mein Name ist Paul.", "pronunciation": "mine NAH-muh ist POW-ul"},
+          {"speaker": "B", "english": "Nice to meet you.", "german": "Freut mich.", "pronunciation": "froyt mikh"},
+          {"speaker": "A", "english": "Nice to meet you too.", "german": "Freut mich auch.", "pronunciation": "froyt mikh owkh"},
+          {"speaker": "B", "english": "Do you live here?", "german": "Wohnst du hier?", "pronunciation": "vohnst doo heer"},
+          {"speaker": "A", "english": "Yes, I live here.", "german": "Ja, ich wohne hier.", "pronunciation": "yah, ikh VOH-nuh heer"},
+          {"speaker": "B", "english": "Do you work nearby?", "german": "Arbeitest du in der Nähe?", "pronunciation": "AR-bye-test doo in dair NAY-uh"},
+          {"speaker": "A", "english": "Yes, at the bakery.", "german": "Ja, in der Bäckerei.", "pronunciation": "yah, in dair bek-uh-RYE"},
+          {"speaker": "B", "english": "That is nice.", "german": "Das ist schön.", "pronunciation": "dahs ist shurn"},
+          {"speaker": "A", "english": "Goodbye!", "german": "Tschüss!", "pronunciation": "chews"},
+          {"speaker": "B", "english": "Goodbye!", "german": "Tschüss!", "pronunciation": "chews"}
+        ],
+        "description": "Practise a complete beginner introduction in Standard German.",
+        "tags": ["German conversation", "German introduction", "Talkivana"]
+      },
+      {
+        "asset_id": "long-2",
+        "title": "Ordering at a German Café",
+        "scenario": "A customer orders a drink at a café.",
+        "learning_objective": "Understand and repeat a polite café conversation in Standard German.",
+        "linked_short_asset_id": "short-2",
+        "focus_vocabulary": [
+          {"english": "water", "german": "Wasser", "pronunciation": "VAH-ser", "part_of_speech": "noun"},
+          {"english": "coffee", "german": "Kaffee", "pronunciation": "kah-FAY", "part_of_speech": "noun"},
+          {"english": "please", "german": "bitte", "pronunciation": "BIT-tuh", "part_of_speech": "adverb"}
+        ],
+        "dialogue": [
+          {"speaker": "A", "english": "Good day.", "german": "Guten Tag.", "pronunciation": "GOO-ten tahk"},
+          {"speaker": "B", "english": "Good day. What would you like?", "german": "Guten Tag. Was möchten Sie?", "pronunciation": "GOO-ten tahk. vahs MURKH-ten zee"},
+          {"speaker": "A", "english": "A coffee, please.", "german": "Einen Kaffee, bitte.", "pronunciation": "EYE-nen kah-FAY, BIT-tuh"},
+          {"speaker": "B", "english": "With milk?", "german": "Mit Milch?", "pronunciation": "mit milkh"},
+          {"speaker": "A", "english": "Yes, with milk, please.", "german": "Ja, mit Milch, bitte.", "pronunciation": "yah, mit milkh, BIT-tuh"},
+          {"speaker": "B", "english": "Would you also like water?", "german": "Möchten Sie auch Wasser?", "pronunciation": "MURKH-ten zee owkh VAH-ser"},
+          {"speaker": "A", "english": "Yes, a water, please.", "german": "Ja, ein Wasser, bitte.", "pronunciation": "yah, ine VAH-ser, BIT-tuh"},
+          {"speaker": "B", "english": "Anything else?", "german": "Sonst noch etwas?", "pronunciation": "zonst nokh ET-vahs"},
+          {"speaker": "A", "english": "No, thank you.", "german": "Nein, danke.", "pronunciation": "nine, DAHN-kuh"},
+          {"speaker": "B", "english": "Here is your coffee.", "german": "Hier ist Ihr Kaffee.", "pronunciation": "heer ist eer kah-FAY"},
+          {"speaker": "A", "english": "Thank you.", "german": "Danke.", "pronunciation": "DAHN-kuh"},
+          {"speaker": "B", "english": "You're welcome.", "german": "Gern geschehen.", "pronunciation": "gairn guh-SHAY-en"}
+        ],
+        "description": "Practise ordering coffee and water politely in Standard German.",
+        "tags": ["German café conversation", "German beginner", "Talkivana"]
+      }
+    ]
+  },
+  "qa_problems": [],
+  "replacement_for": null
+}
