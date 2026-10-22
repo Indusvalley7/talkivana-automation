@@ -269,6 +269,12 @@ def _produce_private_previews(
                 cfg_weight=float(tts_settings["cfg_weight"]),
                 english_reference_audio=str(tts_settings.get("english_reference_audio", "")),
                 german_reference_audio=str(tts_settings.get("german_reference_audio", "")),
+                conversation_voice_references=dict(
+                    tts_settings.get("conversation_voice_references", {})
+                ),
+                require_distinct_conversation_voices=bool(
+                    tts_settings.get("require_distinct_conversation_voices", True)
+                ),
             ),
             output_dir=project_root() / "build" / "review" / str(issue.number),
         )
@@ -634,6 +640,10 @@ def render_chatterbox_demo(*, output_dir: Path, asset_id: str = "long-1") -> Pac
         cfg_weight=float(settings["cfg_weight"]),
         english_reference_audio=str(settings.get("english_reference_audio", "")),
         german_reference_audio=str(settings.get("german_reference_audio", "")),
+        conversation_voice_references=dict(settings.get("conversation_voice_references", {})),
+        require_distinct_conversation_voices=bool(
+            settings.get("require_distinct_conversation_voices", True)
+        ),
     )
     for kind, collection in (("short", record.content["shorts"]), ("long", record.content["long_videos"])):
         for asset in collection:

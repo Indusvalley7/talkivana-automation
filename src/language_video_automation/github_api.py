@@ -187,13 +187,22 @@ def format_issue_body(record: ContentPackRecord) -> str:
     )
     machine_json = json.dumps(record.as_dict(), ensure_ascii=False, sort_keys=True)
     sections_text = "\n\n".join(sections)
-    return f"""## Content approval required
+    return f"""## Daily content review sheet
 
-Reply with one command as the first non-empty line:
+This Issue is the temporary approval file. Review the numbered lines below and reply here;
+you do not need to return to the Codex chat. Put one command on the first non-empty line:
 
 - `APPROVE CONTENT`
-- `REVISE CONTENT: describe the correction`
+- `REVISE CONTENT` followed by correction bullets on the next lines
 - `REJECT: optional reason`
+
+Example:
+
+```text
+REVISE CONTENT
+- long-1, line 4: replace the German with "..."
+- short-2, word 2: use "..." instead
+```
 
 Approval generates four videos and uploads them **privately** for full review. It does not
 schedule or publish anything.

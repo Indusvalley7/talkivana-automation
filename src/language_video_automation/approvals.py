@@ -33,11 +33,13 @@ _COMMANDS = {
 
 
 def parse_approval_command(body: str) -> ApprovalCommand:
-    first_line = next((line.strip() for line in body.splitlines() if line.strip()), "")
+    non_empty = [line.strip() for line in body.splitlines() if line.strip()]
+    first_line = non_empty[0] if non_empty else ""
+    continuation = "\n".join(non_empty[1:])
     normalized = first_line.strip().strip("`*_ ")
     upper = normalized.upper()
     if upper in _COMMANDS:
-        return ApprovalCommand(_COMMANDS[upper])
+        return ApprovalCommand(_COMMANDS[upper], continuation[:4000])
     for prefix, decision in (
         ("REVISE CONTENT:", Decision.REVISE_CONTENT),
         ("RETRY VOICE:", Decision.RETRY_VOICE),
@@ -47,7 +49,19 @@ def parse_approval_command(body: str) -> ApprovalCommand:
         ("REJECT:", Decision.REJECT),
     ):
         if upper.startswith(prefix):
-            return ApprovalCommand(decision, normalized.split(":", 1)[1].strip()[:500])
+            first_reason = normalized.split(":", 1)[1].strip()
+            reason = "\n".join(part for part in (first_reason, continuation) if part)
+            return ApprovalCommand(decision, reason[:4000])
+    for command, decision in (
+        ("REVISE CONTENT", Decision.REVISE_CONTENT),
+        ("RETRY VOICE", Decision.RETRY_VOICE),
+        ("RETRY VISUALS", Decision.RETRY_SLIDES),
+        ("RETRY SLIDES", Decision.RETRY_SLIDES),
+        ("RETRY VIDEO", Decision.RETRY_VIDEO),
+        ("REJECT", Decision.REJECT),
+    ):
+        if upper == command and continuation:
+            return ApprovalCommand(decision, continuation[:4000])
     return ApprovalCommand(Decision.IGNORE)
 
 

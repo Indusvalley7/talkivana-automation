@@ -37,6 +37,7 @@ class NarrationSegment:
     speaker: str = ""
     active_language: str = ""
     cue_text: str = ""
+    voice_id: str = "tutor"
 
 
 @dataclass(frozen=True)
@@ -96,6 +97,8 @@ class ChatterboxSpeechProvider:
         cfg_weight: float = 0.35,
         english_reference_audio: str = "",
         german_reference_audio: str = "",
+        conversation_voice_references: dict[str, str] | None = None,
+        require_distinct_conversation_voices: bool = True,
     ) -> None:
         self.model_version = model_version
         self.requested_device = device
@@ -106,6 +109,11 @@ class ChatterboxSpeechProvider:
             "English": english_reference_audio,
             "German": german_reference_audio,
         }
+        self.conversation_voice_references = {
+            str(speaker).upper(): str(path)
+            for speaker, path in (conversation_voice_references or {}).items()
+        }
+        self.require_distinct_conversation_voices = require_distinct_conversation_voices
         self.request_count = 0
         self._model: Any | None = None
         self._torch: Any | None = None
@@ -150,12 +158,20 @@ class ChatterboxSpeechProvider:
         language = segment.spoken_language.casefold()
         language_id = "de" if language == "german" else "en"
         reference = self.reference_audio["German" if language_id == "de" else "English"]
+        if segment.voice_id.startswith("speaker:"):
+            speaker = segment.voice_id.split(":", 1)[1].upper()
+            reference = self.conversation_voice_references.get(speaker, "")
+            if self.require_distinct_conversation_voices and not reference:
+                raise RenderError(
+                    f"Final-conversation speaker {speaker} has no fixed Chatterbox reference voice. "
+                    "Approve and configure one voice sample per speaker before rendering."
+                )
         if reference and not Path(reference).is_file():
             raise RenderError(f"Configured Chatterbox reference audio does not exist: {reference}")
 
         # A content-derived seed keeps approved lines reproducible across fresh runners.
         digest = hashlib.sha256(
-            f"{self.seed}\0{language_id}\0{segment.transcript}".encode("utf-8")
+            f"{self.seed}\0{language_id}\0{segment.voice_id}\0{segment.transcript}".encode("utf-8")
         ).digest()
         utterance_seed = int.from_bytes(digest[:4], "big")
         self._torch.manual_seed(utterance_seed)
@@ -423,11 +439,8 @@ def _long_timeline(pack: dict[str, Any], asset: dict[str, Any]) -> list[Narratio
                 NarrationSegment(
                     eyebrow=f"LESSON {index} OF {total} • TUTOR",
                     title=str(turn["german"]),
-                    body="Pronunciation coaching",
-                    transcript=(
-                        f"{german_cues[(index - 1) % len(german_cues)]} "
-                        f"A simple pronunciation guide is: {turn['pronunciation']}."
-                    ),
+                    body="Pronunciation guide shown on screen",
+                    transcript=german_cues[(index - 1) % len(german_cues)],
                     spoken_language="English",
                     pause_seconds=0.3,
                     accent="accent",
@@ -515,6 +528,7 @@ def _long_timeline(pack: dict[str, Any], asset: dict[str, Any]) -> list[Narratio
                 german_text=str(turn["german"]),
                 speaker=str(turn["speaker"]),
                 active_language="German",
+                voice_id=f"speaker:{turn['speaker']}",
             )
         )
     return segments
@@ -722,7 +736,7 @@ def _synthesize_cached(
     cache: dict[str, tuple[Path, float]],
 ) -> tuple[Path, float]:
     key = hashlib.sha256(
-        f"{segment.spoken_language}\0{segment.transcript}".encode("utf-8")
+        f"{segment.spoken_language}\0{segment.voice_id}\0{segment.transcript}".encode("utf-8")
     ).hexdigest()[:20]
     if key in cache:
         return cache[key]

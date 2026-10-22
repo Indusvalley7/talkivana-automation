@@ -179,6 +179,16 @@ def validate_production_config(config: AppConfig) -> None:
         raise ConfigurationError("Automatic TTS voice fallback must remain disabled.")
     if str(settings.get("model_version", "")) != "v3":
         raise ConfigurationError("The approved multilingual Chatterbox model version must remain v3.")
+    if not bool(settings.get("require_distinct_conversation_voices", False)):
+        raise ConfigurationError("Distinct fixed voices are required for final conversations.")
+    conversation_voices = settings.get("conversation_voice_references", {})
+    if not isinstance(conversation_voices, dict):
+        raise ConfigurationError("conversation_voice_references must map speaker labels to files.")
+    initial_references = [str(conversation_voices.get(speaker, "")).strip() for speaker in ("A", "B")]
+    if not all(initial_references):
+        raise ConfigurationError("Approved reference voices for speakers A and B are required.")
+    if len(set(initial_references)) != len(initial_references):
+        raise ConfigurationError("Speakers A and B must use different reference voices.")
 
 
 def load_guardrails() -> str:

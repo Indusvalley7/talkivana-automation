@@ -16,7 +16,8 @@
 12. Rejected private preview deletion follows the approved 14-day retention rule.
 13. Production remains disabled until setup, tests, preflight, and dry-run verification succeed.
 14. Review copies must contain intelligible spoken narration; synthetic test tones are forbidden outside automated tests.
-15. Teaching scenes show English above German. Each line uses English once and German twice; the final coherent conversation is German-only and is spoken once.
+15. Teaching scenes show English above German. Each line uses English once and German twice. The simplified pronunciation guide remains visible but is never narrated. The final coherent conversation is German-only and is spoken once.
 16. Use one approved rich-colour template consistently within each video and rotate templates across the four daily videos.
 17. Tutor narration must sound bright, cheerful, encouraging, and conversational—not flat, sleepy, theatrical, or robotic.
-18. Guided lessons include short tutor cues, pronunciation coaching, and encouragement; no silent sentence-practice gap may exceed six seconds.
+18. Guided lessons include short tutor cues, visible pronunciation coaching, and encouragement; no silent sentence-practice gap may exceed six seconds.
+19. In the final whole conversation, every character has one fixed approved voice. Different characters must not share a voice, and the same character must keep the same voice across lessons.

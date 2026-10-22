@@ -15,3 +15,5 @@ Before presenting a content pack:
 11. Return structured data only when a schema is requested.
 12. Verify tutor guidance is useful and varied rather than repeating an identical filler phrase.
 13. Keep learner response time proportional to sentence length and never longer than six seconds.
+14. Confirm no narration transcript contains the simplified pronunciation spelling.
+15. Confirm final-conversation speaker labels map one-to-one to fixed approved reference voices.

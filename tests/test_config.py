@@ -28,8 +28,25 @@ class ConfigTests(unittest.TestCase):
         data = copy.deepcopy(self.base)
         data["system"]["enabled"] = True
         data["playlists"][0]["youtube_playlist_id"] = "PL_TEST_GERMAN"
+        data["models"]["tts_settings"]["conversation_voice_references"] = {
+            "A": "voice_library/speaker-a-female.wav",
+            "B": "voice_library/speaker-b-male.wav",
+        }
         config = self.write(data)
         validate_production_config(config)
+
+    def test_production_rejects_missing_or_shared_character_voices(self):
+        data = copy.deepcopy(self.base)
+        data["system"]["enabled"] = True
+        data["playlists"][0]["youtube_playlist_id"] = "PL_TEST_GERMAN"
+        with self.assertRaises(ConfigurationError):
+            validate_production_config(self.write(data))
+        data["models"]["tts_settings"]["conversation_voice_references"] = {
+            "A": "voice_library/shared.wav",
+            "B": "voice_library/shared.wav",
+        }
+        with self.assertRaises(ConfigurationError):
+            validate_production_config(self.write(data))
 
     def test_nonseparated_slots_are_rejected(self):
         data = copy.deepcopy(self.base)

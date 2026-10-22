@@ -10,7 +10,7 @@ Production is disabled by default. No content is made public without both approv
 
 1. Content generation creates one daily pack: two Shorts and two linked conversations.
 2. Standard German QA validates translations, spelling, simplified pronunciation, and links.
-3. A GitHub Issue requests `APPROVE CONTENT`.
+3. A GitHub Issue acts as the temporary daily review sheet and requests `APPROVE CONTENT`.
 4. After approval, narration, bilingual scene rendering, video assembly, and technical QA run.
 5. Four exact completed files are uploaded privately to YouTube.
 6. The Issue contains the full private links; the Actions run contains 30-second clips.
@@ -22,7 +22,8 @@ Production is disabled by default. No content is made public without both approv
 
 ```text
 APPROVE CONTENT
-REVISE CONTENT: <correction>
+REVISE CONTENT
+- <asset and line number>: <correction>
 APPROVE VIDEO
 RETRY VOICE: <correction>
 RETRY VISUALS: <correction>
@@ -32,6 +33,11 @@ REJECT: <reason>
 
 Commands must be the first non-empty line and come from `Indusvalley7`. Casual language,
 emoji, silence, and the old one-stage `APPROVE` command do nothing.
+
+The daily GitHub Issue is the single review surface. It lists every Short and every numbered
+conversation line, so corrections can be dictated or typed there without returning to Codex.
+Multi-line correction bullets are accepted up to 4,000 characters. The automation generates a
+new revision and updates the review sheet; visible Issue text is never silently treated as approval.
 
 ## Safety properties
 
@@ -47,6 +53,8 @@ emoji, silence, and the old one-stage `APPROVE` command do nothing.
 - The general-audience channel is family-safe and is not marked made-for-kids.
 - Subtitles and closed captions are disabled.
 - Failures stop closed and are visible in the controlling Issue and Actions logs.
+- Simplified pronunciation remains visible on the lesson scene but is never spoken.
+- The final whole conversation uses one stable approved Chatterbox reference voice per character.
 
 ## Local verification
 

@@ -77,6 +77,11 @@
       "cfg_weight": 0.35,
       "english_reference_audio": "",
       "german_reference_audio": "",
+      "conversation_voice_references": {
+        "A": "",
+        "B": ""
+      },
+      "require_distinct_conversation_voices": true,
       "automatic_voice_fallback": false
     }
   },

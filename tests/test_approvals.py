@@ -14,9 +14,18 @@ class ApprovalTests(unittest.TestCase):
         self.assertEqual(parsed.reason, "German line 3 is too fast")
         revised = parse_approval_command("REVISE CONTENT: Replace the café example")
         self.assertEqual(revised.decision, Decision.REVISE_CONTENT)
+        detailed = parse_approval_command(
+            "REVISE CONTENT\n- long-1, line 4: change the German\n- short-2: replace word 2"
+        )
+        self.assertEqual(detailed.decision, Decision.REVISE_CONTENT)
+        self.assertIn("long-1, line 4", detailed.reason)
+        self.assertIn("short-2", detailed.reason)
         visuals = parse_approval_command("RETRY VISUALS: Move the German line lower")
         self.assertEqual(visuals.decision, Decision.RETRY_SLIDES)
         self.assertEqual(visuals.reason, "Move the German line lower")
+        voice = parse_approval_command("RETRY VOICE\n- Speaker B sounds too flat")
+        self.assertEqual(voice.decision, Decision.RETRY_VOICE)
+        self.assertEqual(voice.reason, "- Speaker B sounds too flat")
 
     def test_casual_language_is_not_approval(self):
         for body in ("APPROVE", "looks good", "yes", "approved!", "👍", "> APPROVE VIDEO"):

@@ -51,6 +51,15 @@ class RendererTimelineTests(unittest.TestCase):
         self.assertTrue(repeat_segments)
         self.assertTrue(all(segment.pause_seconds <= 5.0 for segment in repeat_segments))
 
+    def test_pronunciation_guide_is_visible_but_never_spoken(self):
+        asset = self.record.content["long_videos"][0]
+        timeline = build_asset_timeline(self.record.content, asset, "long")
+        pronunciation_values = {turn["pronunciation"] for turn in asset["dialogue"]}
+        spoken = [segment.transcript for segment in timeline]
+        self.assertFalse(any(value in transcript for value in pronunciation_values for transcript in spoken))
+        lesson_segments = [segment for segment in timeline if segment.display_mode == "lesson"]
+        self.assertTrue(all(segment.pronunciation for segment in lesson_segments))
+
     def test_long_ends_with_one_german_only_full_conversation(self):
         asset = self.record.content["long_videos"][0]
         timeline = build_asset_timeline(self.record.content, asset, "long")
@@ -63,6 +72,9 @@ class RendererTimelineTests(unittest.TestCase):
             [turn["german"] for turn in asset["dialogue"]],
         )
         self.assertTrue(all(segment.spoken_language == "German" for segment in conversation))
+        expected_voice_ids = [f"speaker:{turn['speaker']}" for turn in asset["dialogue"]]
+        self.assertEqual([segment.voice_id for segment in conversation], expected_voice_ids)
+        self.assertGreaterEqual(len(set(expected_voice_ids)), 2)
         self.assertEqual(timeline[-len(conversation):], conversation)
 
     def test_lesson_view_keeps_english_above_german_data_together(self):
