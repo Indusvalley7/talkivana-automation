@@ -5,6 +5,7 @@ on:
     types: [created]
 
 permissions:
+  actions: write
   contents: read
   issues: write
 
@@ -18,6 +19,7 @@ jobs:
     if: ${{ !github.event.issue.pull_request }}
     runs-on: ubuntu-latest
     outputs:
+      authorized: ${{ steps.classify.outputs.authorized }}
       decision: ${{ steps.classify.outputs.decision }}
     steps:
       - uses: actions/checkout@v4
@@ -32,15 +34,75 @@ jobs:
         name: Classify the first non-empty line
         run: |
           DECISION="$(python -m language_video_automation classify-event --event "$GITHUB_EVENT_PATH")"
+          AUTHORIZED="$(python -m language_video_automation authorize-event --event "$GITHUB_EVENT_PATH" --repo "$GITHUB_REPOSITORY")"
           echo "decision=$DECISION" >> "$GITHUB_OUTPUT"
+          echo "authorized=$AUTHORIZED" >> "$GITHUB_OUTPUT"
           echo "Command category: $DECISION"
+          echo "Authorized actor: $AUTHORIZED"
 
-  production:
-    name: Voice + slides + assembly + technical QA
+  direct_command:
+    name: Content revision or rejection
     needs: command_gate
-    if: ${{ contains(fromJSON('["approve_content","revise_content","retry_voice","retry_slides","retry_video","reject"]'), needs.command_gate.outputs.decision) }}
+    if: ${{ needs.command_gate.outputs.authorized == 'true' && contains(fromJSON('["revise_content","reject"]'), needs.command_gate.outputs.decision) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e .
+      - name: Apply the non-rendering command
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: python -m language_video_automation process-approval --event "$GITHUB_EVENT_PATH" --repo "$GITHUB_REPOSITORY"
+
+  production_prepare:
+    name: Production controller — authorize and freeze approved content
+    needs: command_gate
+    if: ${{ needs.command_gate.outputs.authorized == 'true' && contains(fromJSON('["approve_content","retry_voice","retry_slides","retry_video"]'), needs.command_gate.outputs.decision) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e .
+      - name: Validate command, content, configuration, and upload credentials
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python -m language_video_automation production-prepare
+          --event "$GITHUB_EVENT_PATH"
+          --repo "$GITHUB_REPOSITORY"
+          --output build/production/production-job.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: production-context
+          path: build/production/production-job.json
+          retention-days: 3
+          if-no-files-found: error
+
+  voice:
+    name: Voice preparation — ${{ matrix.asset }}
+    needs: production_prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        asset: [short-1, short-2, long-1, long-2]
     env:
       HF_HUB_DISABLE_XET: "1"
       PKUSEG_HOME: ${{ github.workspace }}/.cache/pkuseg
@@ -50,8 +112,12 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.11"
           cache: pip
+      - uses: actions/download-artifact@v4
+        with:
+          name: production-context
+          path: build/production
       - name: Cache pinned Chatterbox model files
         uses: actions/cache@v4
         with:
@@ -59,10 +125,10 @@ jobs:
             ~/.cache/huggingface
             .cache/pkuseg
           key: talkivana-chatterbox-v3-65b1843
-      - name: Install FFmpeg and German/Latin fonts
+      - name: Install FFmpeg
         run: |
           sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update -qq
-          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends ffmpeg fonts-noto-core
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends ffmpeg
       - name: Install CPU-only speech runtime
         run: >-
           python -m pip install --disable-pip-version-check
@@ -70,26 +136,198 @@ jobs:
           torch==2.6.0 torchaudio==2.6.0
       - name: Install renderer and pinned open-source TTS
         run: python -m pip install --disable-pip-version-check -e ".[tts]"
-      - name: Execute the stage-appropriate guarded operation
+      - name: Generate and duration-fit narration
+        run: >-
+          python -m language_video_automation production-voice
+          --job build/production/production-job.json
+          --asset "${{ matrix.asset }}"
+          --output "build/stage/${{ matrix.asset }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voice-${{ matrix.asset }}
+          path: build/stage/${{ matrix.asset }}
+          retention-days: 3
+          if-no-files-found: error
+          compression-level: 6
+
+  visuals:
+    name: Visual preparation — ${{ matrix.asset }}
+    needs: voice
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        asset: [short-1, short-2, long-1, long-2]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/download-artifact@v4
+        with:
+          name: voice-${{ matrix.asset }}
+          path: build/stage/${{ matrix.asset }}
+      - name: Install renderer and German/Latin fonts
+        run: |
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update -qq
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends fonts-noto-core
+          python -m pip install --disable-pip-version-check -e .
+      - name: Render bilingual scenes
+        run: >-
+          python -m language_video_automation production-visuals
+          --stage "build/stage/${{ matrix.asset }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: visuals-${{ matrix.asset }}
+          path: build/stage/${{ matrix.asset }}/slides
+          retention-days: 3
+          if-no-files-found: error
+          compression-level: 6
+
+  assembly:
+    name: Assembly + technical QA — ${{ matrix.asset }}
+    needs: [voice, visuals]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        asset: [short-1, short-2, long-1, long-2]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/download-artifact@v4
+        with:
+          name: voice-${{ matrix.asset }}
+          path: build/stage/${{ matrix.asset }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: visuals-${{ matrix.asset }}
+          path: build/stage/${{ matrix.asset }}/slides
+      - name: Install assembler
+        run: |
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update -qq
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends ffmpeg
+          python -m pip install --disable-pip-version-check -e .
+      - name: Assemble, probe duration, and create review excerpt
+        run: >-
+          python -m language_video_automation production-assembly
+          --stage "build/stage/${{ matrix.asset }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: assembled-${{ matrix.asset }}
+          path: |
+            build/stage/${{ matrix.asset }}/output/*.mp4
+            build/stage/${{ matrix.asset }}/output/*-thumbnail.png
+            build/stage/${{ matrix.asset }}/output/asset-result.json
+          retention-days: 3
+          if-no-files-found: error
+          compression-level: 0
+
+  private_upload:
+    name: Guarded private YouTube upload + final approval request
+    needs: assembly
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/download-artifact@v4
+        with:
+          name: production-context
+          path: build/production
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: assembled-*
+          path: build/assembled
+      - run: python -m pip install --disable-pip-version-check -e .
+      - name: Upload all four QA-passed videos as private
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           GH_TOKEN: ${{ github.token }}
-        run: python -m language_video_automation process-approval --event "$GITHUB_EVENT_PATH" --repo "$GITHUB_REPOSITORY"
+        run: >-
+          python -m language_video_automation production-publish
+          --job build/production/production-job.json
+          --input build/assembled
+          --repo "$GITHUB_REPOSITORY"
       - name: Attach 30-second convenience previews
         uses: actions/upload-artifact@v4
         with:
           name: talkivana-30-second-previews-${{ github.event.issue.number }}
-          path: build/review/**/*-preview.mp4
-          if-no-files-found: ignore
+          path: build/assembled/**/*-preview.mp4
+          if-no-files-found: error
           retention-days: 3
           compression-level: 6
+
+  production_failure:
+    name: Failure controller — fail closed and identify the failed job
+    needs: [command_gate, production_prepare, voice, visuals, assembly, private_upload]
+    if: ${{ always() && needs.command_gate.outputs.authorized == 'true' && contains(fromJSON('["approve_content","retry_voice","retry_slides","retry_video"]'), needs.command_gate.outputs.decision) && contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e .
+      - name: Mark the pack failed without publishing anything
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python -m language_video_automation production-failure
+          --event "$GITHUB_EVENT_PATH"
+          --repo "$GITHUB_REPOSITORY"
+
+  artifact_cleanup:
+    name: Cleanup controller — remove full intermediate artifacts
+    needs: [command_gate, production_prepare, voice, visuals, assembly, private_upload, production_failure]
+    if: ${{ always() && needs.command_gate.outputs.authorized == 'true' && contains(fromJSON('["approve_content","retry_voice","retry_slides","retry_video"]'), needs.command_gate.outputs.decision) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Delete voice, scene, and full-video transfer artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const response = await github.rest.actions.listWorkflowRunArtifacts({
+              owner,
+              repo,
+              run_id: context.runId,
+              per_page: 100,
+            });
+            const prefixes = ['production-context', 'voice-', 'visuals-', 'assembled-'];
+            for (const artifact of response.data.artifacts) {
+              if (prefixes.some((prefix) => artifact.name.startsWith(prefix))) {
+                await github.rest.actions.deleteArtifact({ owner, repo, artifact_id: artifact.id });
+                core.info(`Deleted transient artifact: ${artifact.name}`);
+              }
+            }
 
   final_schedule:
     name: Final approval gate → schedule exact private files
     needs: command_gate
-    if: ${{ needs.command_gate.outputs.decision == 'approve_video' }}
+    if: ${{ needs.command_gate.outputs.authorized == 'true' && needs.command_gate.outputs.decision == 'approve_video' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

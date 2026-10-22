@@ -1,6 +1,10 @@
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from language_video_automation.approvals import Decision, is_authorized, parse_approval_command
+from language_video_automation.pipeline import authorize_event
 
 
 class ApprovalTests(unittest.TestCase):
@@ -34,6 +38,14 @@ class ApprovalTests(unittest.TestCase):
     def test_only_configured_actor(self):
         self.assertTrue(is_authorized("Indusvalley7", "Indusvalley7", "Indusvalley7"))
         self.assertFalse(is_authorized("attacker", "Indusvalley7", "Indusvalley7"))
+
+    def test_workflow_gate_rejects_an_unconfigured_actor(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            event_path = Path(temporary) / "event.json"
+            event_path.write_text(
+                json.dumps({"sender": {"login": "attacker"}}), encoding="utf-8"
+            )
+            self.assertFalse(authorize_event(event_path, "Indusvalley7/talkivana-automation"))
 
 
 if __name__ == "__main__":

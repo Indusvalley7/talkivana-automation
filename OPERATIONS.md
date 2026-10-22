@@ -32,8 +32,10 @@ Human waiting never consumes a runner.
 - Audience timing agent
 - Rejected-preview cleanup
 
-Actions logs identify the asset and operation that failed. The GitHub Issue is the durable audit
-record.
+Voice, visual, and assembly work use a four-asset matrix, so independent assets can run in
+parallel. Assembly waits until the full voice and visual stages succeed. Actions logs identify the
+asset and operation that failed, and a final cleanup job deletes full intermediate artifacts. The
+GitHub Issue is the durable audit record.
 
 ## Timing stages
 

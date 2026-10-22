@@ -30,15 +30,37 @@ approved repository voice references, so it requires no Chatterbox or Hugging Fa
 
 ## 2. Create the German playlist
 
-Create the Talkivana German playlist in YouTube Studio. Copy its playlist ID into
-`config/channel.json → playlists[0].youtube_playlist_id`.
+1. Sign into YouTube Studio with the Google account that owns Talkivana.
+2. Open **Content → Playlists → New playlist**.
+3. Name it `Learn German with Talkivana` and choose the desired visibility.
+4. Open the playlist and copy the characters after `list=` in its URL. That is the playlist ID.
+5. Put only that non-secret ID into
+   `config/channel.json → playlists[0].youtube_playlist_id`.
 
 ## 3. Add the Gemini key
 
-Create a Google AI Studio key, then use the hidden GitHub CLI prompt:
+The key-name dialog shown in AI Studio is the correct screen. `Talkivana_automation` is a valid
+name. Selecting **Default Gemini Project** works, but a dedicated project makes quota and future
+billing easier to audit:
+
+1. Sign into Google AI Studio with the Google account that owns Talkivana.
+2. Optional but recommended: in Google Cloud Console, create a project named
+   `Talkivana Automation`. In AI Studio open **Dashboard → Projects → Import projects** and
+   import it.
+3. Open **Dashboard → API Keys → Create API key**.
+4. Name the key `Talkivana_automation`.
+5. Select the dedicated project, or keep **Default Gemini Project** if using the simpler setup.
+6. Click **Create key** and copy it once. Do not paste it into an Issue, commit, or chat.
+7. In GitHub open
+   **Indusvalley7/talkivana-automation → Settings → Secrets and variables → Actions**.
+8. Choose **New repository secret**, name it exactly `GEMINI_API_KEY`, paste the value, and save.
+
+Do not create a general YouTube API key. Talkivana's uploads and private analytics require OAuth,
+which is configured separately below. If GitHub CLI is available, the Gemini key can instead be
+entered through its hidden prompt:
 
 ```bash
-gh secret set GEMINI_API_KEY --repo Indusvalley7/REPOSITORY_NAME
+gh secret set GEMINI_API_KEY --repo Indusvalley7/talkivana-automation
 ```
 
 Free-tier availability and rate limits can change. The workflow fails closed when quota is
@@ -46,23 +68,79 @@ exhausted.
 
 ## 4. Configure Google OAuth
 
-In Google Cloud Console:
+Use the same `Talkivana Automation` Cloud project and the Google account that owns the Talkivana
+channel.
 
-1. Enable YouTube Data API v3 and YouTube Analytics API.
-2. Configure the OAuth consent screen.
-3. Create a Desktop-app OAuth client.
-4. Download its JSON outside this repository.
-5. Run:
+### Enable the two APIs
+
+1. Open Google Cloud Console and select `Talkivana Automation` in the project selector.
+2. Open **APIs & Services → Library**.
+3. Search for **YouTube Data API v3**, open it, and click **Enable**.
+4. Return to the Library, search for **YouTube Analytics API**, open it, and click **Enable**.
+5. The YouTube Reporting API and a separate YouTube API key are not required.
+
+### Configure Google Auth Platform
+
+1. Open **Google Auth Platform → Overview** and choose **Get started** if prompted.
+2. App name: `Talkivana Automation`.
+3. User-support email: the Talkivana Google account.
+4. Audience: choose **External** unless this is a managed Google Workspace organization and only
+   its members will use the app.
+5. Developer contact email: the Talkivana Google account.
+6. Open **Data Access → Add or remove scopes** and add exactly:
+   - `https://www.googleapis.com/auth/youtube`
+   - `https://www.googleapis.com/auth/yt-analytics.readonly`
+7. While initially testing, add the Talkivana Google account under **Audience → Test users**.
+8. Before generating the long-lived refresh token, change the publishing status from **Testing**
+   to **In production**. External apps left in Testing receive refresh tokens that expire after
+   seven days. A personal-use app with fewer than 100 users can remain unverified, although Google
+   may display an unverified-app warning during your own authorization.
+
+### Create the desktop OAuth client
+
+1. Open **Google Auth Platform → Clients → Create client**.
+2. Application type: **Desktop app**.
+3. Name: `Talkivana GitHub Automation`.
+4. Click **Create**, then download the client JSON.
+5. Keep the JSON outside this public repository, for example in Downloads. Never commit it.
+
+### Generate the refresh token and save all three secrets
+
+The repository helper requests offline access to YouTube management and read-only analytics. It
+then writes `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, and `YOUTUBE_REFRESH_TOKEN` directly to
+GitHub without printing their values. GitHub CLI must be installed and signed in once.
+
+Check the GitHub CLI first:
+
+```bash
+gh --version
+gh auth status
+```
+
+If either command is unavailable or reports that you are signed out, install GitHub CLI from
+<https://cli.github.com/> and run `gh auth login`. Choose **GitHub.com**, **HTTPS**, and browser
+authentication.
+
+Run from the repository folder:
 
 ```bash
 python -m pip install -r requirements.txt
 python scripts/setup_youtube_secrets.py \
   --client-secrets /absolute/path/client_secret.json \
-  --repo Indusvalley7/REPOSITORY_NAME
+  --repo Indusvalley7/talkivana-automation
 ```
 
-The helper requests YouTube management and read-only analytics access and writes credentials
-directly into GitHub secrets without printing them.
+When the browser opens:
+
+1. Select the Google account that owns Talkivana.
+2. If that account owns multiple YouTube channels, make sure Talkivana is the channel being
+   authorized.
+3. Review the two requested permissions and approve them.
+4. If Google shows an unverified-app warning, continue only because this is your own private
+   automation project.
+5. Return to the terminal and wait for the confirmation that all three GitHub secrets were saved.
+
+Do not manually send the downloaded JSON or refresh token through chat or email.
 
 ## 5. Enable notifications
 

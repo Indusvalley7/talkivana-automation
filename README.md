@@ -11,7 +11,7 @@ Production is disabled by default. No content is made public without both approv
 1. Content generation creates one daily pack: two Shorts and two linked conversations.
 2. Standard German QA validates translations, spelling, simplified pronunciation, and links.
 3. A GitHub Issue acts as the temporary daily review sheet and requests `APPROVE CONTENT`.
-4. After approval, narration, bilingual scene rendering, video assembly, and technical QA run.
+4. After approval, four voice jobs run in parallel, followed by parallel visual and assembly/QA jobs.
 5. Four exact completed files are uploaded privately to YouTube.
 6. The Issue contains the full private links; the Actions run contains 30-second clips.
 7. Only `APPROVE VIDEO` schedules the exact reviewed files.
@@ -47,7 +47,8 @@ new revision and updates the review sheet; visible Issue text is never silently 
 - Seven unfinished daily packs across either approval gate are allowed; the eighth pauses generation.
 - Four daily publishing slots are distinct and separated by at least three hours.
 - Rejected private previews are deleted after 14 days.
-- Full MP4 files are not stored as GitHub artifacts; only 30-second clips are retained for 3 days.
+- Intermediate narration, scenes, and full MP4 transfers are deleted from Actions as soon as the
+  run finishes; only 30-second convenience clips are retained for 3 days.
 - Every pack embeds a content hash, and every upload has an idempotent manifest.
 - Standard German is required and dialects are forbidden.
 - The general-audience channel is family-safe and is not marked made-for-kids.

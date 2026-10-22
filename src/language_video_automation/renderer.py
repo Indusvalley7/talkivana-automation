@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import os
 import shutil
@@ -9,7 +10,7 @@ import subprocess
 import tempfile
 import wave
 from contextlib import contextmanager
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -665,6 +666,175 @@ def render_asset(
         duration_seconds=actual,
         segment_count=len(resolved),
     )
+
+
+def prepare_asset_voice_stage(
+    *,
+    record: ContentPackRecord,
+    asset: dict[str, Any],
+    kind: str,
+    config: dict[str, Any],
+    speech: SpeechProvider,
+    stage_dir: Path,
+) -> Path:
+    """Synthesize and duration-fit one asset for transfer to later workflow jobs."""
+    _require_ffmpeg()
+    stage_dir.mkdir(parents=True, exist_ok=True)
+    audio_dir = stage_dir / "audio"
+    audio_dir.mkdir(exist_ok=True)
+    timeline = build_asset_timeline(record.content, asset, kind)
+    spec = config["video"][kind]
+    cache: dict[str, tuple[Path, float]] = {}
+    resolved = _resolve_timeline(timeline, speech, audio_dir, cache)
+    resolved = _fit_duration(
+        resolved,
+        asset=asset,
+        kind=kind,
+        speech=speech,
+        audio_dir=audio_dir,
+        cache=cache,
+        minimum=float(spec["minimum_seconds"]),
+        target=float(spec["target_seconds"]),
+        maximum=float(spec["maximum_seconds"]),
+        max_practice_pause=float(config["video"].get("max_practice_pause_seconds", 6.0)),
+    )
+    manifest = {
+        "schema_version": 1,
+        "pack_id": record.pack_id,
+        "asset_id": str(asset["asset_id"]),
+        "kind": kind,
+        "title": str(asset["title"]),
+        "tts_request_count": int(speech.request_count),
+        "segments": [
+            {
+                "narration": asdict(segment),
+                "audio_file": str(path.relative_to(stage_dir)),
+                "audio_duration": duration,
+            }
+            for segment, path, duration in resolved
+        ],
+    }
+    manifest_path = stage_dir / "voice-stage.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+    return manifest_path
+
+
+def prepare_asset_visual_stage(*, config: dict[str, Any], stage_dir: Path) -> None:
+    """Render the visual frames for a completed voice-stage manifest."""
+    manifest, resolved = _load_voice_stage(stage_dir)
+    kind = str(manifest["kind"])
+    spec = config["video"][kind]
+    width, height = int(spec["width"]), int(spec["height"])
+    asset_id = str(manifest["asset_id"])
+    visual_style = _select_visual_style(config["video"].get("visual_style", {}), asset_id)
+    slide_dir = stage_dir / "slides"
+    slide_dir.mkdir(exist_ok=True)
+    for index, (segment, _, _) in enumerate(resolved):
+        _render_scene(
+            segment,
+            slide_dir / f"{index:03d}.png",
+            width=width,
+            height=height,
+            visual_style=visual_style,
+            channel_name=str(config["channel"]["name"]),
+            pack_id=str(manifest["pack_id"]),
+        )
+
+
+def assemble_asset_stage(*, config: dict[str, Any], stage_dir: Path) -> AssetRenderResult:
+    """Combine staged narration and scenes, then run the asset-level technical checks."""
+    _require_ffmpeg()
+    manifest, resolved = _load_voice_stage(stage_dir)
+    asset_id = str(manifest["asset_id"])
+    kind = str(manifest["kind"])
+    title = str(manifest["title"])
+    pack_id = str(manifest["pack_id"])
+    slide_dir = stage_dir / "slides"
+    scenes: list[tuple[Path, float]] = []
+    for index, (segment, _, audio_duration) in enumerate(resolved):
+        scene = slide_dir / f"{index:03d}.png"
+        if not scene.is_file():
+            raise RenderError(f"Missing staged scene {index} for {asset_id}.")
+        scenes.append((scene, audio_duration + segment.pause_seconds))
+
+    output_dir = stage_dir / "output"
+    output_dir.mkdir(exist_ok=True)
+    soundtrack = output_dir / "soundtrack.wav"
+    _join_audio(resolved, soundtrack)
+    concat = output_dir / "slides.ffconcat"
+    _write_concat_file(scenes, concat)
+    video = output_dir / f"{pack_id}-{asset_id}.mp4"
+    _mux_video(
+        concat_file=concat,
+        soundtrack=soundtrack,
+        output=video,
+        fps=int(config["video"]["fps"]),
+    )
+    actual = _probe_duration(video)
+    spec = config["video"][kind]
+    minimum, maximum = float(spec["minimum_seconds"]), float(spec["maximum_seconds"])
+    if actual < minimum - 1 or actual > maximum + 1:
+        raise RenderError(
+            f"{asset_id} duration {actual:.1f}s is outside {minimum:.0f}-{maximum:.0f}s."
+        )
+    thumbnail = output_dir / f"{pack_id}-{asset_id}-thumbnail.png"
+    shutil.copy2(scenes[0][0], thumbnail)
+    preview = output_dir / f"{pack_id}-{asset_id}-preview.mp4"
+    _make_preview(video, preview, seconds=int(config["approval"]["quick_preview_seconds"]))
+    result = AssetRenderResult(
+        asset_id=asset_id,
+        kind=kind,
+        title=title,
+        video_path=video,
+        preview_path=preview,
+        thumbnail_path=thumbnail,
+        duration_seconds=actual,
+        segment_count=len(resolved),
+    )
+    (output_dir / "asset-result.json").write_text(
+        json.dumps(
+            {
+                "asset_id": result.asset_id,
+                "kind": result.kind,
+                "title": result.title,
+                "video_file": result.video_path.name,
+                "preview_file": result.preview_path.name,
+                "thumbnail_file": result.thumbnail_path.name,
+                "duration_seconds": result.duration_seconds,
+                "segment_count": result.segment_count,
+                "tts_request_count": int(manifest.get("tts_request_count", 0)),
+            },
+            indent=2,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    return result
+
+
+def _load_voice_stage(
+    stage_dir: Path,
+) -> tuple[dict[str, Any], list[tuple[NarrationSegment, Path, float]]]:
+    manifest_path = stage_dir / "voice-stage.json"
+    if not manifest_path.is_file():
+        raise RenderError(f"Voice-stage manifest is missing: {manifest_path}")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if int(manifest.get("schema_version", 0)) != 1:
+        raise RenderError("Unsupported voice-stage schema.")
+    resolved: list[tuple[NarrationSegment, Path, float]] = []
+    for item in manifest.get("segments", []):
+        segment = NarrationSegment(**dict(item["narration"]))
+        audio_path = stage_dir / str(item["audio_file"])
+        if not audio_path.is_file():
+            raise RenderError(f"Staged narration is missing: {audio_path}")
+        duration = float(item["audio_duration"])
+        measured = _wav_duration(audio_path)
+        if abs(measured - duration) > 0.05:
+            raise RenderError(f"Staged narration duration changed: {audio_path}")
+        resolved.append((segment, audio_path, duration))
+    if not resolved:
+        raise RenderError("Voice-stage manifest contains no narration segments.")
+    return manifest, resolved
 
 
 def _select_visual_style(style_config: dict[str, Any], asset_id: str) -> dict[str, str]:

@@ -22,10 +22,14 @@ from .github_api import (
 )
 from .models import ContentPackRecord, validate_content_pack, validate_record_integrity
 from .renderer import (
+    AssetRenderResult,
     ChatterboxSpeechProvider,
     GeminiSpeechProvider,
     MacSpeechProvider,
     PackRenderResult,
+    assemble_asset_stage,
+    prepare_asset_visual_stage,
+    prepare_asset_voice_stage,
     render_asset,
     render_pack,
 )
@@ -41,6 +45,13 @@ def classify_event(event_path: Path) -> str:
     event = json.loads(event_path.read_text(encoding="utf-8"))
     command = parse_approval_command(str(event.get("comment", {}).get("body", "")))
     return command.decision.value
+
+
+def authorize_event(event_path: Path, repository: str) -> bool:
+    event = json.loads(event_path.read_text(encoding="utf-8"))
+    sender = str(event.get("sender", {}).get("login", ""))
+    config = load_config()
+    return is_authorized(sender, config.approver_login, repository.split("/", 1)[0])
 
 
 def create_daily_draft(*, repository: str, force: bool = False) -> Issue | None:
@@ -107,6 +118,274 @@ def process_approval_event(*, event_path: Path, repository: str) -> None:
         _process_video_stage(github, config, issue, record, command)
         return
     print(f"Issue #{issue.number} is not at an approval gate; stale command ignored.")
+
+
+def prepare_production_event(*, event_path: Path, repository: str, output_path: Path) -> None:
+    """Authorize a rendering command and persist an immutable descriptor for downstream jobs."""
+    event = json.loads(event_path.read_text(encoding="utf-8"))
+    command = parse_approval_command(str(event.get("comment", {}).get("body", "")))
+    allowed = {
+        Decision.APPROVE_CONTENT,
+        Decision.RETRY_VOICE,
+        Decision.RETRY_SLIDES,
+        Decision.RETRY_VIDEO,
+    }
+    if command.decision not in allowed:
+        raise PipelineError(f"{command.decision.value} is not a production-render command.")
+    config = load_config(require_enabled=True)
+    validate_production_config(config)
+    issue_number = int(event["issue"]["number"])
+    sender = str(event.get("sender", {}).get("login", ""))
+    github = GitHubClient(repository)
+    issue = github.get_issue(issue_number)
+    if not is_authorized(sender, config.approver_login, repository.split("/", 1)[0]):
+        raise PipelineError(f"{sender!r} is not the configured approver.")
+    replace_existing = command.decision in {
+        Decision.RETRY_VOICE,
+        Decision.RETRY_SLIDES,
+        Decision.RETRY_VIDEO,
+    }
+    expected_label = "pack-awaiting-video" if replace_existing else "pack-awaiting-content"
+    if expected_label not in issue.labels:
+        raise PipelineError(
+            f"Issue #{issue.number} is not at the required {expected_label} approval gate."
+        )
+    missing = _missing_youtube_secrets()
+    if missing:
+        github.update_issue(
+            issue.number,
+            labels=["talkivana", "pack-setup-blocked", expected_label],
+        )
+        github.comment(
+            issue.number,
+            "Production is blocked by missing YouTube secrets: "
+            + ", ".join(f"`{name}`" for name in missing)
+            + ". Nothing was rendered or uploaded.",
+        )
+        raise PipelineError(f"Missing repository secrets: {', '.join(missing)}")
+    record = parse_pack_record(issue.body)
+    _validate_record_again(record, config)
+    github.update_issue(issue.number, labels=["talkivana", "pack-producing"])
+    if replace_existing:
+        github.comment(
+            issue.number,
+            f"{command.decision.value.replace('_', ' ').title()} accepted"
+            + (f": {command.reason}" if command.reason else "")
+            + ". Four independent voice workers will rebuild the assets before visuals, assembly, and QA.",
+        )
+    else:
+        github.comment(
+            issue.number,
+            "Content approved. Separate voice, visual, assembly, and technical-QA jobs have started. "
+            "All YouTube uploads will remain private until final approval.",
+        )
+    descriptor = {
+        "schema_version": 1,
+        "issue_number": issue.number,
+        "repository": repository,
+        "decision": command.decision.value,
+        "replace_existing": replace_existing,
+        "record": record.as_dict(),
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(descriptor, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def run_production_voice_job(*, job_path: Path, asset_id: str, output_dir: Path) -> None:
+    descriptor, record, config = _load_production_descriptor(job_path)
+    del descriptor
+    kind, asset = _asset_with_kind(record, asset_id)
+    settings = config.raw["models"]["tts_settings"]
+    if bool(settings.get("automatic_voice_fallback", True)):
+        raise PipelineError("Automatic voice fallback is forbidden.")
+    speech = ChatterboxSpeechProvider(
+        model_version=str(settings["model_version"]),
+        device=str(settings.get("device", "auto")),
+        seed=int(settings["seed"]),
+        exaggeration=float(settings["exaggeration"]),
+        cfg_weight=float(settings["cfg_weight"]),
+        english_reference_audio=str(settings.get("english_reference_audio", "")),
+        german_reference_audio=str(settings.get("german_reference_audio", "")),
+        conversation_voice_references=dict(settings.get("conversation_voice_references", {})),
+        require_distinct_conversation_voices=bool(
+            settings.get("require_distinct_conversation_voices", True)
+        ),
+    )
+    prepare_asset_voice_stage(
+        record=record,
+        asset=asset,
+        kind=kind,
+        config=config.raw,
+        speech=speech,
+        stage_dir=output_dir,
+    )
+
+
+def run_production_visual_job(*, stage_dir: Path) -> None:
+    config = load_config(require_enabled=True)
+    validate_production_config(config)
+    prepare_asset_visual_stage(config=config.raw, stage_dir=stage_dir)
+
+
+def run_production_assembly_job(*, stage_dir: Path) -> AssetRenderResult:
+    config = load_config(require_enabled=True)
+    validate_production_config(config)
+    return assemble_asset_stage(config=config.raw, stage_dir=stage_dir)
+
+
+def publish_production_previews(
+    *, job_path: Path, rendered_root: Path, repository: str
+) -> None:
+    descriptor, record, config = _load_production_descriptor(job_path)
+    issue_number = int(descriptor["issue_number"])
+    if str(descriptor["repository"]) != repository:
+        raise PipelineError("Production descriptor repository does not match the workflow repository.")
+    github = GitHubClient(repository)
+    issue = github.get_issue(issue_number)
+    results: dict[str, tuple[AssetRenderResult, int]] = {}
+    for result_path in rendered_root.rglob("asset-result.json"):
+        data = json.loads(result_path.read_text(encoding="utf-8"))
+        asset_id = str(data["asset_id"])
+        result = AssetRenderResult(
+            asset_id=asset_id,
+            kind=str(data["kind"]),
+            title=str(data["title"]),
+            video_path=result_path.parent / str(data["video_file"]),
+            preview_path=result_path.parent / str(data["preview_file"]),
+            thumbnail_path=result_path.parent / str(data["thumbnail_file"]),
+            duration_seconds=float(data["duration_seconds"]),
+            segment_count=int(data["segment_count"]),
+        )
+        if asset_id in results:
+            raise PipelineError(f"Duplicate assembled artifact for {asset_id}.")
+        if not result.video_path.is_file() or not result.preview_path.is_file():
+            raise PipelineError(f"Assembled files are missing for {asset_id}.")
+        results[asset_id] = (result, int(data.get("tts_request_count", 0)))
+    expected_assets = {"short-1", "short-2", "long-1", "long-2"}
+    if set(results) != expected_assets:
+        raise PipelineError("The assembly jobs did not return all four validated assets.")
+    total_requests = sum(value[1] for value in results.values())
+    maximum = int(config.raw["system"]["max_tts_requests_per_pack"])
+    if total_requests > maximum:
+        raise PipelineError(f"TTS request guard exceeded ({total_requests}/{maximum}).")
+
+    manifest = read_upload_manifest(issue.body)
+    existing_assets = dict(manifest.get("assets", {}))
+    uploader = YouTubeUploader()
+    if bool(descriptor["replace_existing"]):
+        for value in existing_assets.values():
+            video_id = str(value.get("video_id", ""))
+            if video_id:
+                uploader.delete_private(video_id)
+        existing_assets = {}
+        manifest = {
+            "pack_id": record.pack_id,
+            "assets": {},
+            "preview_workflow_run": os.environ.get("GITHUB_RUN_ID", ""),
+        }
+        latest = github.get_issue(issue_number)
+        github.update_issue(issue_number, body=write_upload_manifest(latest.body, manifest))
+
+    youtube = config.raw["youtube"]
+    asset_content = _assets_by_id(record)
+    for asset_id in ("short-1", "short-2", "long-1", "long-2"):
+        if asset_id in existing_assets:
+            continue
+        result = results[asset_id][0]
+        content = asset_content[asset_id]
+        description = (
+            f"{content['description']}\n\n{config.raw['channel']['description_footer']}\n"
+            f"Pack ID: {record.pack_id}\nAsset ID: {asset_id}"
+        )
+        tags = list(dict.fromkeys([*content.get("tags", []), *youtube.get("tags", [])]))
+        uploaded = uploader.upload_private(
+            video_path=result.video_path,
+            title=str(content["title"]),
+            description=description,
+            tags=tags,
+            category_id=str(youtube["category_id"]),
+            default_language=str(youtube["default_language"]),
+            made_for_kids=bool(youtube["made_for_kids"]),
+            contains_synthetic_media=bool(youtube["contains_synthetic_media"]),
+        )
+        existing_assets[asset_id] = {
+            "asset_id": asset_id,
+            "kind": result.kind,
+            "title": result.title,
+            "video_id": uploaded.video_id,
+            "url": uploaded.url,
+            "duration_seconds": round(result.duration_seconds, 3),
+            "uploaded_at": datetime.now(timezone.utc).isoformat(),
+        }
+        manifest = {
+            "pack_id": record.pack_id,
+            "assets": existing_assets,
+            "preview_workflow_run": os.environ.get("GITHUB_RUN_ID", ""),
+        }
+        latest = github.get_issue(issue_number)
+        github.update_issue(issue_number, body=write_upload_manifest(latest.body, manifest))
+
+    github.update_issue(issue_number, labels=["talkivana", "pack-awaiting-video"])
+    links = "\n".join(
+        f"- **{asset_id} — {value['title']}:** {value['url']}"
+        for asset_id, value in sorted(existing_assets.items())
+    )
+    run_url = f"https://github.com/{repository}/actions/runs/{os.environ.get('GITHUB_RUN_ID', '')}"
+    github.comment(
+        issue_number,
+        "## Final-video approval required\n\n"
+        "Watch every full private video while signed into the Talkivana channel account:\n\n"
+        f"{links}\n\n"
+        f"Thirty-second convenience clips are attached to [{run_url}]({run_url}) for three days.\n\n"
+        "Reply with `APPROVE VIDEO`, `RETRY VOICE: correction`, "
+        "`RETRY VISUALS: correction`, `RETRY VIDEO: correction`, or `REJECT: reason`.\n\n"
+        "Nothing is scheduled or public yet.",
+    )
+
+
+def report_production_failure(*, event_path: Path, repository: str) -> None:
+    event = json.loads(event_path.read_text(encoding="utf-8"))
+    issue_number = int(event["issue"]["number"])
+    github = GitHubClient(repository)
+    issue = github.get_issue(issue_number)
+    labels = ["talkivana", "pack-failed"]
+    if read_upload_manifest(issue.body).get("assets"):
+        labels.append("pack-awaiting-video")
+    else:
+        labels.append("pack-awaiting-content")
+    github.update_issue(issue_number, labels=labels)
+    run_id = os.environ.get("GITHUB_RUN_ID", "")
+    run_url = f"https://github.com/{repository}/actions/runs/{run_id}"
+    github.comment(
+        issue_number,
+        f"Production failed closed. No video was made public. Inspect the failed job at {run_url}.",
+    )
+
+
+def _load_production_descriptor(
+    job_path: Path,
+) -> tuple[dict[str, Any], ContentPackRecord, AppConfig]:
+    descriptor = json.loads(job_path.read_text(encoding="utf-8"))
+    if int(descriptor.get("schema_version", 0)) != 1:
+        raise PipelineError("Unsupported production-job descriptor.")
+    record = ContentPackRecord.from_dict(dict(descriptor["record"]))
+    config = load_config(require_enabled=True)
+    validate_production_config(config)
+    _validate_record_again(record, config)
+    return descriptor, record, config
+
+
+def _asset_with_kind(
+    record: ContentPackRecord, asset_id: str
+) -> tuple[str, dict[str, Any]]:
+    for kind, collection in (
+        ("short", record.content["shorts"]),
+        ("long", record.content["long_videos"]),
+    ):
+        for asset in collection:
+            if str(asset["asset_id"]) == asset_id:
+                return kind, asset
+    raise PipelineError(f"Unknown production asset: {asset_id}")
 
 
 def _process_content_stage(
@@ -568,6 +847,11 @@ def _missing_secrets() -> list[str]:
     names = (
         "GEMINI_API_KEY", "YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN",
     )
+    return [name for name in names if not os.environ.get(name)]
+
+
+def _missing_youtube_secrets() -> list[str]:
+    names = ("YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN")
     return [name for name in names if not os.environ.get(name)]
 
 

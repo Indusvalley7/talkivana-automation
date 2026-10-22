@@ -1,9 +1,15 @@
 import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from language_video_automation.config import project_root
 from language_video_automation.models import ContentPackRecord
-from language_video_automation.renderer import build_asset_timeline
+from language_video_automation.renderer import (
+    TestToneSpeechProvider,
+    build_asset_timeline,
+    prepare_asset_voice_stage,
+)
 
 
 class RendererTimelineTests(unittest.TestCase):
@@ -100,6 +106,27 @@ class RendererTimelineTests(unittest.TestCase):
         self.assertTrue(all(segment.display_mode == "lesson" for segment in first_line))
         self.assertTrue(all(segment.english_text == asset["dialogue"][0]["english"] for segment in first_line))
         self.assertTrue(all(segment.german_text == asset["dialogue"][0]["german"] for segment in first_line))
+
+    def test_voice_job_writes_a_portable_stage_manifest(self):
+        asset = self.record.content["shorts"][0]
+        with tempfile.TemporaryDirectory() as temporary:
+            stage_dir = Path(temporary)
+            manifest_path = prepare_asset_voice_stage(
+                record=self.record,
+                asset=asset,
+                kind="short",
+                config=json.loads(
+                    (project_root() / "config" / "channel.json").read_text(encoding="utf-8")
+                ),
+                speech=TestToneSpeechProvider(),
+                stage_dir=stage_dir,
+            )
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["asset_id"], "short-1")
+            self.assertTrue(manifest["segments"])
+            self.assertTrue(
+                all((stage_dir / item["audio_file"]).is_file() for item in manifest["segments"])
+            )
 
 
 if __name__ == "__main__":
