@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Talkivana Automation creates and manages beginner language-learning videos for the Talkivana YouTube channel.">
+  <title>Talkivana Automation</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #f8fafc;
+      --muted: #cbd5e1;
+      --panel: rgba(255, 255, 255, 0.08);
+      --teal: #2dd4bf;
+      --gold: #f6c85f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 32px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 15% 20%, rgba(45, 212, 191, 0.22), transparent 30%),
+        radial-gradient(circle at 85% 75%, rgba(246, 200, 95, 0.18), transparent 28%),
+        linear-gradient(135deg, #071827, #0b3a42 58%, #11213a);
+    }
+    main {
+      width: min(760px, 100%);
+      padding: clamp(32px, 6vw, 64px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 28px;
+      background: var(--panel);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(16px);
+    }
+    .eyebrow {
+      margin: 0 0 18px;
+      color: var(--gold);
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(2.5rem, 8vw, 5.4rem);
+      line-height: 0.95;
+      letter-spacing: -0.05em;
+    }
+    p {
+      max-width: 60ch;
+      margin: 28px 0 0;
+      color: var(--muted);
+      font-size: clamp(1rem, 2.4vw, 1.2rem);
+      line-height: 1.7;
+    }
+    nav { margin-top: 34px; }
+    a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 11px 18px;
+      border: 1px solid rgba(45, 212, 191, 0.55);
+      border-radius: 999px;
+      color: #d9fffa;
+      font-weight: 750;
+      text-decoration: none;
+    }
+    a:hover, a:focus-visible { background: rgba(45, 212, 191, 0.12); }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">Talkivana</p>
+    <h1>Speak beyond borders.</h1>
+    <p>
+      Talkivana Automation is a private content-production tool used by the
+      Talkivana channel owner to create, schedule, publish, and review
+      beginner-friendly language-learning videos on YouTube.
+    </p>
+    <nav aria-label="Legal">
+      <a href="privacy.html">Privacy policy</a>
+    </nav>
+  </main>
+</body>
+</html>
