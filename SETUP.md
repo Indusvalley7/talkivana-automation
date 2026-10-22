@@ -4,8 +4,29 @@ Production must remain disabled until the dry run succeeds.
 
 ## 1. Create the repository
 
-Create a private repository under `Indusvalley7` and push this folder so `.github`, `config`,
-`guardrails`, and `src` are at its root. Enable GitHub Issues and Actions.
+Use the public `Indusvalley7/talkivana-automation` repository with `.github`, `config`,
+`guardrails`, and `src` at its root. Keep GitHub Issues and Actions enabled. The two approved
+Chatterbox reference recordings are intentionally public in this repository; never commit API
+keys, Google OAuth files, refresh tokens, or any unrelated personal recording.
+
+GitHub supplies a short-lived `GITHUB_TOKEN` to every workflow automatically. A personal access
+token is not required for this system.
+
+## Credentials and settings checklist
+
+| Item | Secret? | Where it is used |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | Yes | Content generation and Standard German QA |
+| Google Desktop OAuth client JSON | Yes | Used once by the local setup helper to create the three YouTube secrets below |
+| `YOUTUBE_CLIENT_ID` | Yes | Private upload, scheduling, and analytics |
+| `YOUTUBE_CLIENT_SECRET` | Yes | Private upload, scheduling, and analytics |
+| `YOUTUBE_REFRESH_TOKEN` | Yes | Long-running YouTube authorization without daily sign-in |
+| German YouTube playlist ID | No | Routes uploads into the German playlist |
+| GitHub email notification setting | No | Sends approval and failure notices from GitHub |
+
+Do not paste secret values into an Issue, commit, or chat. Enter them directly in GitHub Actions
+secrets, or use the local helper below. Chatterbox uses its public open-source model and the
+approved repository voice references, so it requires no Chatterbox or Hugging Face API key.
 
 ## 2. Create the German playlist
 
@@ -47,7 +68,8 @@ directly into GitHub secrets without printing them.
 
 Watch the repository with **All Activity** and enable email notifications for assigned Issues.
 Email replies become Issue comments only when GitHub email reply handling is available. The
-GitHub Issue remains the authoritative approval surface.
+GitHub Issue remains the authoritative approval surface. No email password or SMTP credential is
+required because these messages are GitHub notifications, not mail sent by Talkivana itself.
 
 ## 6. Test while locked
 
