@@ -377,16 +377,38 @@ def _long_timeline(pack: dict[str, Any], asset: dict[str, Any]) -> list[Narratio
             eyebrow="TALKIVANA • ABSOLUTE BEGINNER",
             title=str(asset["title"]),
             body=str(asset["learning_objective"]),
-            transcript=(
-                f"Welcome to Talkivana! Today, {asset['learning_objective'].lower()} "
-                "I will guide you one sentence at a time. First, listen to the English meaning. "
-                "Then you will hear the German twice, with time to repeat it aloud. Let's begin!"
-            ),
+            transcript=f"Welcome to Talkivana! Today, {asset['learning_objective'].lower()}",
             spoken_language="English",
-            pause_seconds=2.0,
+            pause_seconds=0.9,
             accent="secondary",
             display_mode="intro",
-        )
+        ),
+        NarrationSegment(
+            eyebrow="TALKIVANA • HOW THIS LESSON WORKS",
+            title=str(asset["title"]),
+            body="English meaning first",
+            transcript=(
+                "I will guide you one sentence at a time. "
+                "First, listen to the English meaning."
+            ),
+            spoken_language="English",
+            pause_seconds=0.8,
+            accent="secondary",
+            display_mode="intro",
+        ),
+        NarrationSegment(
+            eyebrow="TALKIVANA • HOW THIS LESSON WORKS",
+            title=str(asset["title"]),
+            body="German twice, then repeat aloud",
+            transcript=(
+                "Then you will hear the German twice, with time to repeat it aloud. "
+                "Let's begin!"
+            ),
+            spoken_language="English",
+            pause_seconds=1.5,
+            accent="secondary",
+            display_mode="intro",
+        ),
     ]
     total = len(asset["dialogue"])
     lead_ins = (

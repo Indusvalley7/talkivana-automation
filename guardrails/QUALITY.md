@@ -17,3 +17,4 @@ Before presenting a content pack:
 13. Keep learner response time proportional to sentence length and never longer than six seconds.
 14. Confirm no narration transcript contains the simplified pronunciation spelling.
 15. Confirm final-conversation speaker labels map one-to-one to fixed approved reference voices.
+16. Keep the opening tutor guidance in short, cheerful beats with natural pauses; never slow or time-stretch spoken audio in a way that could distort pronunciation.

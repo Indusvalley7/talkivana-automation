@@ -51,6 +51,15 @@ class RendererTimelineTests(unittest.TestCase):
         self.assertTrue(repeat_segments)
         self.assertTrue(all(segment.pause_seconds <= 5.0 for segment in repeat_segments))
 
+    def test_long_opening_is_broken_into_shorter_tutor_beats(self):
+        asset = self.record.content["long_videos"][0]
+        timeline = build_asset_timeline(self.record.content, asset, "long")
+        intro = [segment for segment in timeline if segment.display_mode == "intro"]
+        self.assertEqual(len(intro), 3)
+        self.assertEqual([segment.pause_seconds for segment in intro], [0.9, 0.8, 1.5])
+        self.assertTrue(all(segment.spoken_language == "English" for segment in intro))
+        self.assertTrue(all(len(segment.transcript.split()) <= 20 for segment in intro))
+
     def test_pronunciation_guide_is_visible_but_never_spoken(self):
         asset = self.record.content["long_videos"][0]
         timeline = build_asset_timeline(self.record.content, asset, "long")
@@ -80,7 +89,14 @@ class RendererTimelineTests(unittest.TestCase):
     def test_lesson_view_keeps_english_above_german_data_together(self):
         asset = self.record.content["long_videos"][0]
         timeline = build_asset_timeline(self.record.content, asset, "long")
-        first_line = timeline[1:7]
+        first_turn = asset["dialogue"][0]
+        first_line = [
+            segment for segment in timeline
+            if segment.display_mode == "lesson"
+            and segment.english_text == first_turn["english"]
+            and segment.german_text == first_turn["german"]
+        ]
+        self.assertEqual(len(first_line), 6)
         self.assertTrue(all(segment.display_mode == "lesson" for segment in first_line))
         self.assertTrue(all(segment.english_text == asset["dialogue"][0]["english"] for segment in first_line))
         self.assertTrue(all(segment.german_text == asset["dialogue"][0]["german"] for segment in first_line))
