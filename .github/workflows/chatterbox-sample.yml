@@ -46,13 +46,19 @@ jobs:
             .cache/pkuseg
           key: talkivana-chatterbox-v3-65b1843
 
+      - name: Install FFmpeg and German/Latin fonts
+        run: |
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update -qq
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends ffmpeg fonts-noto-core
+
+      - name: Install CPU-only speech runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          --index-url https://download.pytorch.org/whl/cpu
+          torch==2.6.0 torchaudio==2.6.0
+
       - name: Install renderer and pinned open-source TTS
         run: python -m pip install --disable-pip-version-check -e ".[tts]"
-
-      - name: Install FFmpeg and Talkivana fonts
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg fonts-noto-core fonts-noto-cjk
 
       - name: Render exactly one sample
         run: >-
