@@ -5,7 +5,9 @@
 3. Never treat silence, casual agreement, emoji, edited Issue text, or `APPROVE` as authorization.
 4. Upload completed review copies privately. Final approval schedules those exact uploaded files.
 5. Fail closed on missing credentials, invalid language data, rendering errors, or incomplete upload manifests.
-6. Never expose credentials, tokens, audio, or full rendered files in Issues or Git history.
+6. Never expose credentials, tokens, private recordings, generated narration, or full rendered
+   files in Issues or Git history. Only user-approved synthetic reference clips with documented
+   provenance may be versioned in the public repository.
 7. Production narration uses only the pinned Chatterbox Multilingual voice configuration. Never
    substitute another voice automatically; stop and notify the approver if synthesis fails.
 7. Never use scraped media, copyrighted characters, song lyrics, celebrity likenesses, or unlicensed assets.

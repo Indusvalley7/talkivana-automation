@@ -12,5 +12,7 @@ build/
 dist/
 *.mp4
 *.wav
+!voice_library/speaker-a-current-chatterbox.wav
+!voice_library/speaker-b-woman.wav
 client_secret*.json
 token*.json

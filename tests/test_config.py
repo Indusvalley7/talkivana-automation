@@ -39,6 +39,10 @@ class ConfigTests(unittest.TestCase):
         data = copy.deepcopy(self.base)
         data["system"]["enabled"] = True
         data["playlists"][0]["youtube_playlist_id"] = "PL_TEST_GERMAN"
+        data["models"]["tts_settings"]["conversation_voice_references"] = {
+            "A": "",
+            "B": "",
+        }
         with self.assertRaises(ConfigurationError):
             validate_production_config(self.write(data))
         data["models"]["tts_settings"]["conversation_voice_references"] = {

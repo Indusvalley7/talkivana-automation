@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "approved_on": "2026-10-22",
+  "voices": {
+    "A": {
+      "file": "voice_library/speaker-a-current-chatterbox.wav",
+      "display_role": "Speaker A",
+      "provenance": "Extracted from the user-approved first Talkivana Chatterbox review sample",
+      "synthetic": true,
+      "sample_rate_hz": 24000,
+      "channels": 1,
+      "duration_seconds": 14.645,
+      "sha256": "0da6dc049e61699b78aba2296bb1dc1ba615c84418ab61b4f919fcd29f63fcb5"
+    },
+    "B": {
+      "file": "voice_library/speaker-b-woman.wav",
+      "display_role": "Speaker B — woman",
+      "provenance": "Selected and supplied by the user after generation in the official Chatterbox Multilingual V3 demo",
+      "synthetic": true,
+      "sample_rate_hz": 24000,
+      "channels": 1,
+      "duration_seconds": 7.6,
+      "sha256": "59d249e78b5b374483e733470c285bf964e2eb55b8487cdd09eaf9b7c6b0bd68"
+    }
+  }
+}

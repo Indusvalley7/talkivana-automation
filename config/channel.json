@@ -78,8 +78,8 @@
       "english_reference_audio": "",
       "german_reference_audio": "",
       "conversation_voice_references": {
-        "A": "",
-        "B": ""
+        "A": "voice_library/speaker-a-current-chatterbox.wav",
+        "B": "voice_library/speaker-b-woman.wav"
       },
       "require_distinct_conversation_voices": true,
       "automatic_voice_fallback": false
