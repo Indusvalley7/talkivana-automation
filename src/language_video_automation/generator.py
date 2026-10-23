@@ -84,7 +84,7 @@ Follow every repository guardrail below and return only the requested structured
             prompt=prompt,
             schema=CONTENT_PACK_JSON_SCHEMA,
         )
-        self._validate(pack, playlist)
+        self._apply_fixed_fields(pack, playlist)
 
         qa_prompt = f"""
 Act as a strict Standard German bilingual editor and educational-quality reviewer.
@@ -110,6 +110,7 @@ Pack:
         corrected = qa.get("corrected_pack")
         if not isinstance(corrected, dict):
             raise ValueError("QA response did not contain corrected_pack.")
+        self._apply_fixed_fields(corrected, playlist)
         self._validate(corrected, playlist)
         return build_pack_record(
             corrected,
@@ -118,6 +119,13 @@ Pack:
             replacement_for=replacement_for,
             today=today,
         )
+
+    def _apply_fixed_fields(self, pack: dict, playlist: Playlist) -> None:
+        """Keep channel configuration authoritative over model-written metadata."""
+        pack["source_language"] = str(self.config.raw["channel"]["source_language"])
+        pack["target_language"] = playlist.target_language
+        pack["language_variety"] = playlist.variety
+        pack["level"] = str(self.config.raw["channel"]["level"])
 
     def _validate(self, pack: dict, playlist: Playlist) -> None:
         validate_content_pack(
