@@ -18,6 +18,22 @@ from language_video_automation.models import (
 
 
 class ModelTests(unittest.TestCase):
+    def test_provider_schema_avoids_nested_array_state_explosion(self):
+        from language_video_automation.models import CONTENT_PACK_JSON_SCHEMA, QA_JSON_SCHEMA
+
+        def walk(value):
+            if isinstance(value, dict):
+                self.assertNotIn("minItems", value)
+                self.assertNotIn("maxItems", value)
+                for child in value.values():
+                    walk(child)
+            elif isinstance(value, list):
+                for child in value:
+                    walk(child)
+
+        walk(CONTENT_PACK_JSON_SCHEMA)
+        walk(QA_JSON_SCHEMA)
+
     @classmethod
     def setUpClass(cls):
         data = json.loads(

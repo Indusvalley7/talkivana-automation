@@ -45,12 +45,10 @@ SHORT_SCHEMA: dict[str, Any] = {
         "linked_long_asset_id": {"type": "string"},
         "vocabulary": {
             "type": "array",
-            "minItems": 1,
-            "maxItems": 6,
             "items": VOCABULARY_SCHEMA,
         },
         "description": {"type": "string"},
-        "tags": {"type": "array", "minItems": 3, "maxItems": 10, "items": {"type": "string"}},
+        "tags": {"type": "array", "items": {"type": "string"}},
     },
     "required": [
         "asset_id", "title", "topic", "linked_long_asset_id",
@@ -69,18 +67,14 @@ LONG_SCHEMA: dict[str, Any] = {
         "linked_short_asset_id": {"type": "string"},
         "focus_vocabulary": {
             "type": "array",
-            "minItems": 1,
-            "maxItems": 6,
             "items": VOCABULARY_SCHEMA,
         },
         "dialogue": {
             "type": "array",
-            "minItems": 6,
-            "maxItems": 16,
             "items": DIALOGUE_TURN_SCHEMA,
         },
         "description": {"type": "string"},
-        "tags": {"type": "array", "minItems": 3, "maxItems": 10, "items": {"type": "string"}},
+        "tags": {"type": "array", "items": {"type": "string"}},
     },
     "required": [
         "asset_id", "title", "scenario", "learning_objective", "linked_short_asset_id",
@@ -97,8 +91,8 @@ CONTENT_PACK_JSON_SCHEMA: dict[str, Any] = {
         "target_language": {"type": "string"},
         "language_variety": {"type": "string"},
         "level": {"type": "string"},
-        "shorts": {"type": "array", "minItems": 2, "maxItems": 2, "items": SHORT_SCHEMA},
-        "long_videos": {"type": "array", "minItems": 2, "maxItems": 2, "items": LONG_SCHEMA},
+        "shorts": {"type": "array", "items": SHORT_SCHEMA},
+        "long_videos": {"type": "array", "items": LONG_SCHEMA},
     },
     "required": [
         "pack_title", "source_language", "target_language", "language_variety",
@@ -111,7 +105,7 @@ QA_JSON_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
         "approved": {"type": "boolean"},
-        "problems": {"type": "array", "maxItems": 20, "items": {"type": "string"}},
+        "problems": {"type": "array", "items": {"type": "string"}},
         "corrected_pack": CONTENT_PACK_JSON_SCHEMA,
     },
     "required": ["approved", "problems", "corrected_pack"],
