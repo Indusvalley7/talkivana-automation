@@ -1,7 +1,9 @@
 import json
 import tempfile
 import unittest
+import wave
 from pathlib import Path
+from unittest.mock import patch
 
 from language_video_automation.config import project_root
 from language_video_automation.models import ContentPackRecord
@@ -109,18 +111,30 @@ class RendererTimelineTests(unittest.TestCase):
 
     def test_voice_job_writes_a_portable_stage_manifest(self):
         asset = self.record.content["shorts"][0]
+
+        def wav_duration(path):
+            with wave.open(str(path), "rb") as stream:
+                return stream.getnframes() / stream.getframerate()
+
         with tempfile.TemporaryDirectory() as temporary:
             stage_dir = Path(temporary)
-            manifest_path = prepare_asset_voice_stage(
-                record=self.record,
-                asset=asset,
-                kind="short",
-                config=json.loads(
-                    (project_root() / "config" / "channel.json").read_text(encoding="utf-8")
+            with (
+                patch("language_video_automation.renderer._require_ffmpeg"),
+                patch(
+                    "language_video_automation.renderer._probe_duration",
+                    side_effect=wav_duration,
                 ),
-                speech=TestToneSpeechProvider(),
-                stage_dir=stage_dir,
-            )
+            ):
+                manifest_path = prepare_asset_voice_stage(
+                    record=self.record,
+                    asset=asset,
+                    kind="short",
+                    config=json.loads(
+                        (project_root() / "config" / "channel.json").read_text(encoding="utf-8")
+                    ),
+                    speech=TestToneSpeechProvider(),
+                    stage_dir=stage_dir,
+                )
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(manifest["asset_id"], "short-1")
             self.assertTrue(manifest["segments"])
