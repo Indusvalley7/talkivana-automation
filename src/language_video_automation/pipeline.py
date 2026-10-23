@@ -873,7 +873,7 @@ def run_preflight(*, mode: str) -> list[str]:
         validate_production_config(config)
     except ConfigurationError as exc:
         problems.append(str(exc))
-    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+    if mode == "local" and (not shutil.which("ffmpeg") or not shutil.which("ffprobe")):
         problems.append("ffmpeg and ffprobe are required")
     if mode == "github":
         missing = _missing_secrets()
