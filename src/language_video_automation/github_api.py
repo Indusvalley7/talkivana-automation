@@ -21,6 +21,7 @@ LABELS: dict[str, tuple[str, str]] = {
     "pack-awaiting-content": ("d99a2b", "Waiting for content approval"),
     "pack-producing": ("168c82", "Voice, visuals, and assembly in progress"),
     "pack-awaiting-video": ("f47764", "Waiting for final-video approval"),
+    "pack-sample-approved": ("1d76db", "Controlled sample accepted; nothing scheduled"),
     "pack-scheduled": ("0e8a16", "Approved and scheduled"),
     "pack-rejected": ("6e7781", "Rejected by the owner"),
     "pack-failed": ("b60205", "Automation failed closed"),

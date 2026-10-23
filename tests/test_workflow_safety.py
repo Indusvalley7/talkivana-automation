@@ -19,6 +19,13 @@ class WorkflowSafetyTests(unittest.TestCase):
                 self.assertIn("github.event_name == 'workflow_dispatch'", text)
                 self.assertIn("vars.TALKIVANA_DAILY_AUTOMATION == 'true'", text)
 
+    def test_production_matrix_comes_from_the_frozen_descriptor(self):
+        text = (
+            project_root() / ".github" / "workflows" / "process-approval.yml"
+        ).read_text(encoding="utf-8")
+        self.assertEqual(text.count("fromJSON(needs.production_prepare.outputs.asset_matrix)"), 3)
+        self.assertIn("talkivana-full-controlled-sample", text)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -163,11 +163,14 @@ lock is active or the playlist ID and secrets are absent.
 3. Run System preflight and require a clean pass.
 4. Manually run Talkivana — content generation.
 5. Request a content revision and verify the replacement.
-6. Approve content and review all four private full videos.
-7. Retry one video pack and verify old private previews are replaced.
-8. Approve the final videos.
-9. Confirm the two Shorts are scheduled one day before the linked long lessons.
-10. Confirm the Audience Timing Agent Issue exists.
+6. Keep `system.dry_run_asset_id=long-1`, approve content, and review the single downloadable
+   controlled sample. `APPROVE VIDEO` records sample acceptance without uploading or scheduling.
+7. Clear `system.dry_run_asset_id`, then approve a fresh content pack and review all four private
+   full videos.
+8. Retry one video pack and verify old private previews are replaced.
+9. Approve the final videos.
+10. Confirm the two Shorts are scheduled one day before the linked long lessons.
+11. Confirm the Audience Timing Agent Issue exists.
 
 Only after this sequence should the repository variable `TALKIVANA_DAILY_AUTOMATION` be set to
 `true`, enabling daily schedules.

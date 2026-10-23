@@ -100,6 +100,7 @@ def process_approval_event(*, event_path: Path, repository: str) -> None:
     issue_number = int(event["issue"]["number"])
     sender = str(event.get("sender", {}).get("login", ""))
     github = GitHubClient(repository)
+    github.ensure_labels()
     issue = github.get_issue(issue_number)
     if not is_authorized(sender, config.approver_login, repository.split("/", 1)[0]):
         github.comment(issue_number, f"Command ignored: `{sender}` is not the configured approver.")
@@ -137,6 +138,7 @@ def prepare_production_event(*, event_path: Path, repository: str, output_path: 
     issue_number = int(event["issue"]["number"])
     sender = str(event.get("sender", {}).get("login", ""))
     github = GitHubClient(repository)
+    github.ensure_labels()
     issue = github.get_issue(issue_number)
     if not is_authorized(sender, config.approver_login, repository.split("/", 1)[0]):
         raise PipelineError(f"{sender!r} is not the configured approver.")
@@ -165,19 +167,26 @@ def prepare_production_event(*, event_path: Path, repository: str, output_path: 
         raise PipelineError(f"Missing repository secrets: {', '.join(missing)}")
     record = parse_pack_record(issue.body)
     _validate_record_again(record, config)
+    asset_ids = _production_asset_ids(config)
     github.update_issue(issue.number, labels=["talkivana", "pack-producing"])
     if replace_existing:
         github.comment(
             issue.number,
             f"{command.decision.value.replace('_', ' ').title()} accepted"
             + (f": {command.reason}" if command.reason else "")
-            + ". Four independent voice workers will rebuild the assets before visuals, assembly, and QA.",
+            + f". {len(asset_ids)} voice worker(s) will rebuild the selected asset(s) before "
+            "visuals, assembly, and QA.",
         )
     else:
         github.comment(
             issue.number,
-            "Content approved. Separate voice, visual, assembly, and technical-QA jobs have started. "
-            "All YouTube uploads will remain private until final approval.",
+            f"Content approved. Voice, visual, assembly, and technical-QA jobs have started for "
+            f"{', '.join(asset_ids)}. "
+            + (
+                "Controlled dry-run output will remain a GitHub artifact and will not be uploaded."
+                if len(asset_ids) == 1
+                else "All YouTube uploads will remain private until final approval."
+            ),
         )
     descriptor = {
         "schema_version": 1,
@@ -185,6 +194,8 @@ def prepare_production_event(*, event_path: Path, repository: str, output_path: 
         "repository": repository,
         "decision": command.decision.value,
         "replace_existing": replace_existing,
+        "dry_run": len(asset_ids) == 1,
+        "asset_ids": list(asset_ids),
         "record": record.as_dict(),
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -193,7 +204,8 @@ def prepare_production_event(*, event_path: Path, repository: str, output_path: 
 
 def run_production_voice_job(*, job_path: Path, asset_id: str, output_dir: Path) -> None:
     descriptor, record, config = _load_production_descriptor(job_path)
-    del descriptor
+    if asset_id not in descriptor["asset_ids"]:
+        raise PipelineError(f"Asset {asset_id!r} is outside this production descriptor.")
     kind, asset = _asset_with_kind(record, asset_id)
     settings = config.raw["models"]["tts_settings"]
     if bool(settings.get("automatic_voice_fallback", True)):
@@ -261,13 +273,40 @@ def publish_production_previews(
         if not result.video_path.is_file() or not result.preview_path.is_file():
             raise PipelineError(f"Assembled files are missing for {asset_id}.")
         results[asset_id] = (result, int(data.get("tts_request_count", 0)))
-    expected_assets = {"short-1", "short-2", "long-1", "long-2"}
+    expected_assets = set(descriptor["asset_ids"])
     if set(results) != expected_assets:
-        raise PipelineError("The assembly jobs did not return all four validated assets.")
+        raise PipelineError("The assembly jobs did not return the descriptor's validated assets.")
     total_requests = sum(value[1] for value in results.values())
     maximum = int(config.raw["system"]["max_tts_requests_per_pack"])
     if total_requests > maximum:
         raise PipelineError(f"TTS request guard exceeded ({total_requests}/{maximum}).")
+
+    if bool(descriptor["dry_run"]):
+        sample_asset_id = str(descriptor["asset_ids"][0])
+        manifest = {
+            "pack_id": record.pack_id,
+            "assets": {},
+            "dry_run": True,
+            "sample_asset_id": sample_asset_id,
+            "preview_workflow_run": os.environ.get("GITHUB_RUN_ID", ""),
+        }
+        latest = github.get_issue(issue_number)
+        github.update_issue(
+            issue_number,
+            body=write_upload_manifest(latest.body, manifest),
+            labels=["talkivana", "pack-awaiting-video"],
+        )
+        run_url = f"https://github.com/{repository}/actions/runs/{os.environ.get('GITHUB_RUN_ID', '')}"
+        github.comment(
+            issue_number,
+            "## Controlled sample ready\n\n"
+            f"Only `{sample_asset_id}` was rendered. Download the full-video artifact from "
+            f"[{run_url}]({run_url}). Nothing was uploaded to YouTube.\n\n"
+            "Reply with `APPROVE VIDEO` to accept this sample without scheduling anything, "
+            "`RETRY VOICE: correction`, `RETRY VISUALS: correction`, "
+            "`RETRY VIDEO: correction`, or `REJECT: reason`.",
+        )
+        return
 
     manifest = read_upload_manifest(issue.body)
     existing_assets = dict(manifest.get("assets", {}))
@@ -372,7 +411,20 @@ def _load_production_descriptor(
     config = load_config(require_enabled=True)
     validate_production_config(config)
     _validate_record_again(record, config)
+    allowed = {"short-1", "short-2", "long-1", "long-2"}
+    asset_ids = descriptor.get("asset_ids") or sorted(allowed)
+    if not isinstance(asset_ids, list) or not asset_ids or not set(asset_ids) <= allowed:
+        raise PipelineError("Production descriptor contains invalid asset IDs.")
+    descriptor["asset_ids"] = [str(item) for item in asset_ids]
+    descriptor["dry_run"] = bool(descriptor.get("dry_run", len(asset_ids) == 1))
     return descriptor, record, config
+
+
+def _production_asset_ids(config: AppConfig) -> tuple[str, ...]:
+    dry_run_asset = str(config.raw["system"].get("dry_run_asset_id", "")).strip()
+    if dry_run_asset:
+        return (dry_run_asset,)
+    return ("short-1", "short-2", "long-1", "long-2")
 
 
 def _asset_with_kind(
@@ -414,7 +466,20 @@ def _process_video_stage(
     command: ApprovalCommand,
 ) -> None:
     if command.decision is Decision.APPROVE_VIDEO:
-        _schedule_approved_pack(github, config, issue, record)
+        manifest = read_upload_manifest(issue.body)
+        if bool(manifest.get("dry_run")):
+            github.update_issue(
+                issue.number,
+                labels=["talkivana", "pack-sample-approved"],
+                state="closed",
+            )
+            github.comment(
+                issue.number,
+                "Controlled sample approved. No YouTube upload was created and nothing was scheduled. "
+                "Daily schedules remain disabled.",
+            )
+        else:
+            _schedule_approved_pack(github, config, issue, record)
     elif command.decision in {Decision.RETRY_VOICE, Decision.RETRY_SLIDES, Decision.RETRY_VIDEO}:
         # A complete deterministic rerender prevents a corrected component from becoming
         # desynchronised with the approved audio/visual timeline.

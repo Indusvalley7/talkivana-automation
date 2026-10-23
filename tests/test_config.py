@@ -57,6 +57,18 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ConfigurationError):
             self.write(data)
 
+    def test_unknown_dry_run_asset_is_rejected(self):
+        data = copy.deepcopy(self.base)
+        data["system"]["dry_run_asset_id"] = "long-99"
+        with self.assertRaises(ConfigurationError):
+            self.write(data)
+
+    def test_controlled_dry_run_selects_only_one_asset(self):
+        from language_video_automation.pipeline import _production_asset_ids
+
+        config = load_config()
+        self.assertEqual(_production_asset_ids(config), ("long-1",))
+
 
 if __name__ == "__main__":
     unittest.main()

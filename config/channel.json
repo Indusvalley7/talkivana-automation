@@ -1,6 +1,7 @@
 {
   "system": {
     "enabled": true,
+    "dry_run_asset_id": "long-1",
     "schema_version": 2,
     "max_generation_requests_per_run": 8,
     "max_tts_requests_per_pack": 180,

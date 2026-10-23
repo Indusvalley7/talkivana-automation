@@ -67,6 +67,9 @@ jobs:
     if: ${{ needs.command_gate.outputs.authorized == 'true' && contains(fromJSON('["approve_content","retry_voice","retry_slides","retry_video"]'), needs.command_gate.outputs.decision) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      asset_matrix: ${{ steps.production_matrix.outputs.asset_matrix }}
+      dry_run: ${{ steps.production_matrix.outputs.dry_run }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -87,6 +90,11 @@ jobs:
           --event "$GITHUB_EVENT_PATH"
           --repo "$GITHUB_REPOSITORY"
           --output build/production/production-job.json
+      - id: production_matrix
+        name: Expose the immutable asset matrix
+        run: |
+          echo "asset_matrix=$(jq -c '.asset_ids' build/production/production-job.json)" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$(jq -r '.dry_run' build/production/production-job.json)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
           name: production-context
@@ -102,7 +110,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        asset: [short-1, short-2, long-1, long-2]
+        asset: ${{ fromJSON(needs.production_prepare.outputs.asset_matrix) }}
     env:
       HF_HUB_DISABLE_XET: "1"
       PKUSEG_HOME: ${{ github.workspace }}/.cache/pkuseg
@@ -152,13 +160,13 @@ jobs:
 
   visuals:
     name: Visual preparation — ${{ matrix.asset }}
-    needs: voice
+    needs: [production_prepare, voice]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        asset: [short-1, short-2, long-1, long-2]
+        asset: ${{ fromJSON(needs.production_prepare.outputs.asset_matrix) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -190,13 +198,13 @@ jobs:
 
   assembly:
     name: Assembly + technical QA — ${{ matrix.asset }}
-    needs: [voice, visuals]
+    needs: [production_prepare, voice, visuals]
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
-        asset: [short-1, short-2, long-1, long-2]
+        asset: ${{ fromJSON(needs.production_prepare.outputs.asset_matrix) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -234,8 +242,8 @@ jobs:
           compression-level: 0
 
   private_upload:
-    name: Guarded private YouTube upload + final approval request
-    needs: assembly
+    name: Guarded sample/private-video handoff + final approval request
+    needs: [production_prepare, assembly]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -255,7 +263,7 @@ jobs:
           pattern: assembled-*
           path: build/assembled
       - run: python -m pip install --disable-pip-version-check -e .
-      - name: Upload all four QA-passed videos as private
+      - name: Register controlled sample or upload the complete pack privately
         env:
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
@@ -266,6 +274,15 @@ jobs:
           --job build/production/production-job.json
           --input build/assembled
           --repo "$GITHUB_REPOSITORY"
+      - name: Attach the full controlled sample
+        if: ${{ needs.production_prepare.outputs.dry_run == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: talkivana-full-controlled-sample-${{ github.event.issue.number }}
+          path: build/assembled/**/*.mp4
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
       - name: Attach 30-second convenience previews
         uses: actions/upload-artifact@v4
         with:
