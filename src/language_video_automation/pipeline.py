@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from .analytics import current_timing_assignments
+from .analytics import YouTubeAnalyticsClient, current_timing_assignments
 from .approvals import ApprovalCommand, Decision, is_authorized, parse_approval_command
 from .config import AppConfig, ConfigurationError, load_config, project_root, validate_production_config
 from .gemini import GeminiClient
@@ -876,9 +876,28 @@ def run_preflight(*, mode: str) -> list[str]:
     if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
         problems.append("ffmpeg and ffprobe are required")
     if mode == "github":
-        problems.extend(f"missing secret: {name}" for name in _missing_secrets())
+        missing = _missing_secrets()
+        problems.extend(f"missing secret: {name}" for name in missing)
         if not os.environ.get("GITHUB_TOKEN") and not os.environ.get("GH_TOKEN"):
             problems.append("missing GitHub Actions token")
+        if not missing:
+            try:
+                playlist = config.active_playlists[0]
+                identity = YouTubeUploader().validate_access(
+                    expected_channel_name=str(config.raw["channel"]["name"]),
+                    playlist_id=playlist.youtube_playlist_id,
+                )
+                print(
+                    "YouTube access confirmed for "
+                    f"{identity['channel_title']} / {identity['playlist_title']}."
+                )
+            except Exception as exc:
+                problems.append(_safe_error(exc))
+            try:
+                YouTubeAnalyticsClient().validate_access()
+                print("YouTube Analytics read access confirmed.")
+            except Exception as exc:
+                problems.append(_safe_error(exc))
     return problems
 
 

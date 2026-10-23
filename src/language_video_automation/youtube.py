@@ -54,6 +54,50 @@ class YouTubeUploader:
         )
         self.service = build("youtube", "v3", credentials=credentials, cache_discovery=False)
 
+    def validate_access(self, *, expected_channel_name: str, playlist_id: str) -> dict[str, str]:
+        """Verify the authorized channel and configured playlist without changing YouTube."""
+        try:
+            channel_response = self.service.channels().list(
+                part="snippet",
+                mine=True,
+                maxResults=1,
+            ).execute()
+            channels = channel_response.get("items") or []
+            if len(channels) != 1:
+                raise YouTubeError("The authorized account did not return exactly one YouTube channel.")
+            channel = channels[0]
+            channel_id = str(channel.get("id", ""))
+            channel_title = str(channel.get("snippet", {}).get("title", ""))
+            if not channel_id or not channel_title:
+                raise YouTubeError("The authorized YouTube channel has incomplete identity data.")
+            if channel_title.casefold() != expected_channel_name.casefold():
+                raise YouTubeError(
+                    f"Authorized channel is {channel_title!r}, expected {expected_channel_name!r}."
+                )
+
+            playlist_response = self.service.playlists().list(
+                part="snippet,status",
+                id=playlist_id,
+                maxResults=1,
+            ).execute()
+            playlists = playlist_response.get("items") or []
+            if len(playlists) != 1:
+                raise YouTubeError(f"Configured playlist {playlist_id!r} was not found.")
+            playlist = playlists[0]
+            playlist_channel_id = str(playlist.get("snippet", {}).get("channelId", ""))
+            if playlist_channel_id != channel_id:
+                raise YouTubeError("The configured playlist does not belong to the authorized channel.")
+            return {
+                "channel_id": channel_id,
+                "channel_title": channel_title,
+                "playlist_id": str(playlist.get("id", "")),
+                "playlist_title": str(playlist.get("snippet", {}).get("title", "")),
+            }
+        except YouTubeError:
+            raise
+        except Exception as exc:
+            raise YouTubeError(f"YouTube access validation failed: {exc}") from exc
+
     def upload_private(
         self,
         *,

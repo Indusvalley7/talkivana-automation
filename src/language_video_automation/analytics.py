@@ -48,6 +48,19 @@ class YouTubeAnalyticsClient:
         )
         self.service = build("youtubeAnalytics", "v2", credentials=credentials, cache_discovery=False)
 
+    def validate_access(self) -> None:
+        """Perform a minimal read-only query to validate the Analytics grant."""
+        day = date.today() - timedelta(days=1)
+        try:
+            self.service.reports().query(
+                ids="channel==MINE",
+                startDate=day.isoformat(),
+                endDate=day.isoformat(),
+                metrics="views",
+            ).execute()
+        except Exception as exc:
+            raise AnalyticsError(f"YouTube Analytics access validation failed: {exc}") from exc
+
     def video_metrics(self, *, video_id: str, start_date: date, end_date: date) -> dict[str, float]:
         if end_date < start_date:
             return {}

@@ -57,6 +57,8 @@ content or videos.
 - Retry: the owner uses a targeted retry command; the pack is fully rebuilt to preserve sync.
 - Emergency stop: set `system.enabled` to `false`. Manually cancel already scheduled videos in
   YouTube Studio if necessary.
+- Schedule stop: delete or set the repository variable `TALKIVANA_DAILY_AUTOMATION` to anything
+  other than `true`. Manual approval handling remains available for an existing pack.
 
 Rejected private previews remain recoverable for 14 days, then the authorized cleanup workflow
 deletes them.

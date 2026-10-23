@@ -18,11 +18,10 @@ class ConfigTests(unittest.TestCase):
         path.write_text(json.dumps(data), encoding="utf-8")
         return load_config(path)
 
-    def test_default_configuration_is_safely_disabled(self):
+    def test_checked_in_configuration_is_ready_for_manual_dry_run(self):
         config = load_config()
-        self.assertFalse(config.enabled)
-        with self.assertRaises(ConfigurationError):
-            validate_production_config(config)
+        self.assertTrue(config.enabled)
+        validate_production_config(config)
 
     def test_config_can_become_production_ready(self):
         data = copy.deepcopy(self.base)

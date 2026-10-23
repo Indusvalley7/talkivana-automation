@@ -12,6 +12,7 @@ permissions:
 jobs:
   cleanup:
     name: Delete rejected private previews after 14 days
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.TALKIVANA_DAILY_AUTOMATION == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -30,4 +31,3 @@ jobs:
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           GH_TOKEN: ${{ github.token }}
         run: python -m language_video_automation cleanup-previews --repo "$GITHUB_REPOSITORY"
-

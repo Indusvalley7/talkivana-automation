@@ -41,7 +41,9 @@ new revision and updates the review sheet; visible Issue text is never silently 
 
 ## Safety properties
 
-- `config/channel.json` keeps `system.enabled=false` until setup and dry-run checks finish.
+- Manual production commands require `config/channel.json` to keep `system.enabled=true`.
+- Scheduled jobs also require the independent repository variable
+  `TALKIVANA_DAILY_AUTOMATION=true`; it remains unset throughout the controlled dry run.
 - Content and final-video approval are independent.
 - Uploads remain private until final approval.
 - Seven unfinished daily packs across either approval gate are allowed; the eighth pauses generation.

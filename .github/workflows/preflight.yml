@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   preflight:
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.TALKIVANA_DAILY_AUTOMATION == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -24,6 +25,11 @@ jobs:
           python-version: "3.12"
           cache: pip
 
+      - name: Install media dependency
+        run: |
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update -qq
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends ffmpeg
+
       - name: Install application
         run: python -m pip install --disable-pip-version-check -e .
 
@@ -35,4 +41,3 @@ jobs:
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           GH_TOKEN: ${{ github.token }}
         run: python -m language_video_automation preflight --mode github
-
