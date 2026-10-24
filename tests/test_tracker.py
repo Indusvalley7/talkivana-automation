@@ -29,6 +29,26 @@ class TrackerTests(unittest.TestCase):
         self.assertEqual((approved, rejected), ("Yes", "No"))
         self.assertIn("scheduled", reason)
 
+    def test_closed_unpublished_pack_uses_owner_reason(self):
+        issue = Issue(
+            number=2,
+            title="Unintended pack",
+            body="",
+            state="closed",
+            labels=("talkivana",),
+            html_url="https://example.test/issues/2",
+        )
+        approved, rejected, reason = _review_state(
+            issue,
+            [{
+                "user": {"login": "Indusvalley7"},
+                "body": "Closed because this was an unintended new lesson pack.",
+            }],
+            approver_login="Indusvalley7",
+        )
+        self.assertEqual((approved, rejected), ("No", "Yes"))
+        self.assertEqual(reason, "Closed because this was an unintended new lesson pack.")
+
     def test_csv_quotes_multiline_content_descriptions(self):
         row = {field: "" for field in TRACKER_FIELDS}
         row.update({

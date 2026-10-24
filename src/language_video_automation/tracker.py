@@ -147,14 +147,20 @@ def _review_state(
     approver_login: str,
 ) -> tuple[str, str, str]:
     latest_command = ""
+    latest_owner_comment = ""
     for comment in comments:
         if str(comment.get("user", {}).get("login", "")).casefold() != approver_login.casefold():
             continue
         body = str(comment.get("body", "")).strip()
+        if body:
+            latest_owner_comment = body
         first = body.splitlines()[0].strip().upper() if body else ""
         if first.startswith(("APPROVE", "REJECT", "REVISE", "RETRY")):
             latest_command = body
     detail = " ".join(line.strip() for line in latest_command.splitlines() if line.strip())
+    owner_note = " ".join(
+        line.strip() for line in latest_owner_comment.splitlines() if line.strip()
+    )
     labels = set(issue.labels)
     if "pack-scheduled" in labels:
         return "Yes", "No", "Final videos approved; publication scheduled."
@@ -171,6 +177,12 @@ def _review_state(
         return "No", "No", "Pending correction because automation is blocked or failed."
     if "pack-sample-approved" in labels:
         return "Yes", "No", "Controlled sample approved; not intended for publication."
+    if issue.state == "closed":
+        return (
+            "No",
+            "Yes",
+            owner_note or "Closed without publication; see the linked GitHub Issue.",
+        )
     return "No", "No", "Status pending; see the linked GitHub Issue."
 
 
