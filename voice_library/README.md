@@ -6,8 +6,14 @@ character. Configure the approved files in `config/channel.json` under
 
 Approved initial mapping:
 
+- Standard German teaching narration: the user-selected woman voice generated with the official
+  Chatterbox V3 demo (`speaker-b-woman.wav`)
 - Speaker A: the current Chatterbox voice retained from the first Talkivana review sample
 - Speaker B: the user-selected woman voice generated with the official Chatterbox V3 demo
+
+The teaching-narration mapping applies to German lesson lines outside the final conversation.
+English tutor guidance continues to use the configured English/default narration voice. In the
+final conversation, the per-character mapping takes precedence so Speakers A and B remain distinct.
 
 Each reference must be a clean, licensed or owner-consented WAV clip with no music or effects.
 Do not use celebrity audio, scraped speech, or a real person's voice without explicit consent.

@@ -182,6 +182,9 @@ def validate_production_config(config: AppConfig) -> None:
         raise ConfigurationError("Automatic TTS voice fallback must remain disabled.")
     if str(settings.get("model_version", "")) != "v3":
         raise ConfigurationError("The approved multilingual Chatterbox model version must remain v3.")
+    german_reference = str(settings.get("german_reference_audio", "")).strip()
+    if not german_reference:
+        raise ConfigurationError("An approved Standard German narration reference is required.")
     if not bool(settings.get("require_distinct_conversation_voices", False)):
         raise ConfigurationError("Distinct fixed voices are required for final conversations.")
     conversation_voices = settings.get("conversation_voice_references", {})

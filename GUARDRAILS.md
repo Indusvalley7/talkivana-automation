@@ -23,3 +23,4 @@
 17. Tutor narration must sound bright, cheerful, encouraging, and conversational—not flat, sleepy, theatrical, or robotic.
 18. Guided lessons include short tutor cues, visible pronunciation coaching, and encouragement; no silent sentence-practice gap may exceed six seconds.
 19. In the final whole conversation, every character has one fixed approved voice. Different characters must not share a voice, and the same character must keep the same voice across lessons.
+20. Standard German teaching narration uses the approved German reference recording. A voice retry must not silently fall back to the model's unprompted default voice.

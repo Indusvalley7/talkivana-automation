@@ -51,6 +51,12 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ConfigurationError):
             validate_production_config(self.write(data))
 
+    def test_production_requires_approved_german_narration_reference(self):
+        data = copy.deepcopy(self.base)
+        data["models"]["tts_settings"]["german_reference_audio"] = ""
+        with self.assertRaises(ConfigurationError):
+            validate_production_config(self.write(data))
+
     def test_nonseparated_slots_are_rejected(self):
         data = copy.deepcopy(self.base)
         data["youtube"]["seed_publish_slots_local"] = ["08:00", "08:30", "18:00", "22:00"]
