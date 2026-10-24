@@ -16,7 +16,7 @@ concurrency:
 jobs:
   tracker:
     name: Rebuild approval, publishing, and analytics tracker
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.TALKIVANA_DAILY_AUTOMATION == 'true' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.TALKIVANA_TRACKER_AUTOMATION == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

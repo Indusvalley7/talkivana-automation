@@ -15,3 +15,7 @@ repeating the channel's long standard description template in every row.
 
 `successfully_published` becomes `Yes` only after YouTube reports that the video is public.
 Being scheduled is not treated as successful publication.
+
+The tracker refreshes daily at approximately 9:11 AM `Asia/Kolkata` when the independent
+`TALKIVANA_TRACKER_AUTOMATION` repository switch is enabled. It does not generate, approve,
+schedule, or publish videos.
