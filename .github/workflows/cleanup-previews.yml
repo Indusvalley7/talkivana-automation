@@ -12,7 +12,7 @@ permissions:
 jobs:
   cleanup:
     name: Delete rejected private previews after 14 days
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.TALKIVANA_DAILY_AUTOMATION == 'true' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.TALKIVANA_CLEANUP_AUTOMATION == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:

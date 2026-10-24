@@ -158,8 +158,10 @@ lock is active or the playlist ID and secrets are absent.
 ## 7. Dry run
 
 1. Set a real German playlist ID and, if known, the timing-agent launch date.
-2. Set `system.enabled=true` for the controlled manual dry run. Leave the repository variable
-   `TALKIVANA_DAILY_AUTOMATION` unset so scheduled jobs remain skipped.
+2. Set `system.enabled=true` for the controlled manual dry run. Leave the repository variables
+   `TALKIVANA_CONTENT_AUTOMATION`, `TALKIVANA_ANALYTICS_AUTOMATION`,
+   `TALKIVANA_TRACKER_AUTOMATION`, and `TALKIVANA_CLEANUP_AUTOMATION` unset so scheduled jobs
+   remain skipped.
 3. Run System preflight and require a clean pass.
 4. Manually run Talkivana — content generation.
 5. Request a content revision and verify the replacement.
@@ -172,5 +174,6 @@ lock is active or the playlist ID and secrets are absent.
 10. Confirm the two Shorts are scheduled one day before the linked long lessons.
 11. Confirm the Audience Timing Agent Issue exists.
 
-Only after this sequence should the repository variable `TALKIVANA_DAILY_AUTOMATION` be set to
-`true`, enabling daily schedules.
+Only after this sequence should the required repository variables be enabled. Content generation,
+analytics collection, tracker refresh, and rejected-preview deletion have separate switches so one
+schedule can be activated without silently activating the others.

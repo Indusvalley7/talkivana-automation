@@ -22,7 +22,7 @@ concurrency:
 jobs:
   analytics:
     name: Customer-online analysis — collect equal-window evidence
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.TALKIVANA_DAILY_AUTOMATION == 'true' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.TALKIVANA_ANALYTICS_AUTOMATION == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

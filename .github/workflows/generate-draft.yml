@@ -22,7 +22,7 @@ concurrency:
 jobs:
   preflight:
     name: Parent agent — safety preflight
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.TALKIVANA_DAILY_AUTOMATION == 'true' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.TALKIVANA_CONTENT_AUTOMATION == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:

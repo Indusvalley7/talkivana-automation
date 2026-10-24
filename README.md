@@ -42,8 +42,10 @@ new revision and updates the review sheet; visible Issue text is never silently 
 ## Safety properties
 
 - Manual production commands require `config/channel.json` to keep `system.enabled=true`.
-- Scheduled jobs also require the independent repository variable
-  `TALKIVANA_DAILY_AUTOMATION=true`; it remains unset throughout the controlled dry run.
+- Scheduled content, analytics, tracker, and cleanup jobs use separate repository variables:
+  `TALKIVANA_CONTENT_AUTOMATION`, `TALKIVANA_ANALYTICS_AUTOMATION`,
+  `TALKIVANA_TRACKER_AUTOMATION`, and `TALKIVANA_CLEANUP_AUTOMATION`. Each must explicitly equal
+  `true`; all remain unset throughout the controlled dry run.
 - While `system.dry_run_asset_id` is set, content approval renders only that asset as a temporary
   GitHub artifact. It does not upload to YouTube, and sample approval cannot schedule anything.
 - Content and final-video approval are independent.
