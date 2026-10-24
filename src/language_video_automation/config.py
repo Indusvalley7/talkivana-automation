@@ -143,10 +143,18 @@ def _validate_shape(raw: dict[str, Any]) -> None:
     if min(circular_gaps) < minimum_gap:
         raise ConfigurationError("Publishing slots are too close together.")
     long_description_template = str(raw["youtube"].get("long_description_template", ""))
-    if not all(token in long_description_template for token in ("{lesson_topic}", "{situation}")):
+    description_tokens = (
+        "{brand_bold}",
+        "{lesson_topic_bold}",
+        "{situation_bold}",
+        "{tagline_bold}",
+    )
+    if not all(token in long_description_template for token in description_tokens):
         raise ConfigurationError(
-            "youtube.long_description_template must contain lesson_topic and situation placeholders."
+            "youtube.long_description_template is missing a required display placeholder."
         )
+    if "**" in long_description_template:
+        raise ConfigurationError("YouTube descriptions must not contain Markdown bold markers.")
     if len(long_description_template) > 4500:
         raise ConfigurationError("youtube.long_description_template is too long.")
     try:

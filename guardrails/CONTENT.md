@@ -16,6 +16,8 @@
 - Use Standard German used in Germany. Do not use dialect spellings or regional dialect lessons.
 - Every long-video YouTube description uses the approved channel template. Only the lesson-topic
   and situation placeholders may change, and both are derived from the approved video heading.
+- Never emit Markdown `**` markers into YouTube descriptions. The automated bold emphasis uses
+  API-safe Unicode display characters only for the explicitly approved highlighted phrases.
 - Build progressive, original, practical situations for absolute beginners.
 - Make each scenario, objective, wording, and learning progression materially distinct.
 - Avoid recent vocabulary unless deliberate review is named and pedagogically useful.

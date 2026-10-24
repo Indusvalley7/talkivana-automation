@@ -1,7 +1,7 @@
 import unittest
 
 from language_video_automation.config import load_config
-from language_video_automation.pipeline import build_youtube_description
+from language_video_automation.pipeline import _visual_bold, build_youtube_description
 
 
 class DescriptionTests(unittest.TestCase):
@@ -14,8 +14,11 @@ class DescriptionTests(unittest.TestCase):
             asset_id="long-1",
         )
         topic = "booking a doctor's appointment"
-        self.assertIn(f"we’ll practise **{topic}**", description)
-        self.assertIn(f"Useful phrases for **{topic}**", description)
+        bold_topic = _visual_bold(topic)
+        self.assertIn(f"we’ll practise {bold_topic}", description)
+        self.assertIn(f"Useful phrases for {bold_topic}", description)
+        self.assertIn(_visual_bold("Talkivana"), description)
+        self.assertNotIn("**", description)
         self.assertTrue(description.endswith("#SpeakingPractice #Talkivana"))
         self.assertNotIn("Pack ID:", description)
 

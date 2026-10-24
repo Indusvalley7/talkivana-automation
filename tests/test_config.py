@@ -65,7 +65,13 @@ class ConfigTests(unittest.TestCase):
 
     def test_long_description_template_requires_both_dynamic_fields(self):
         data = copy.deepcopy(self.base)
-        data["youtube"]["long_description_template"] = "Only {lesson_topic} is present."
+        data["youtube"]["long_description_template"] = "Only {lesson_topic_bold} is present."
+        with self.assertRaises(ConfigurationError):
+            self.write(data)
+
+    def test_long_description_template_rejects_markdown_bold_markers(self):
+        data = copy.deepcopy(self.base)
+        data["youtube"]["long_description_template"] += " **visible stars**"
         with self.assertRaises(ConfigurationError):
             self.write(data)
 

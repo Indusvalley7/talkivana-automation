@@ -853,11 +853,32 @@ def build_youtube_description(
         heading = str(content["title"]).strip().rstrip(".")
         topic = heading.lower()
         template = str(config.raw["youtube"]["long_description_template"])
-        return template.format(lesson_topic=topic, situation=topic)
+        return template.format(
+            brand_bold=_visual_bold("Talkivana"),
+            lesson_topic_bold=_visual_bold(topic),
+            situation_bold=_visual_bold(topic),
+            tagline_bold=_visual_bold("Talkivana — Real Conversations. Clear Language."),
+        )
     return (
         f"{content['description']}\n\n{config.raw['channel']['description_footer']}\n"
         f"Pack ID: {pack_id}\nAsset ID: {asset_id}"
     )
+
+
+def _visual_bold(value: str) -> str:
+    """Use API-safe Unicode display characters because the Data API has no rich-text spans."""
+    converted: list[str] = []
+    for character in value:
+        codepoint = ord(character)
+        if ord("A") <= codepoint <= ord("Z"):
+            converted.append(chr(0x1D5D4 + codepoint - ord("A")))
+        elif ord("a") <= codepoint <= ord("z"):
+            converted.append(chr(0x1D5EE + codepoint - ord("a")))
+        elif ord("0") <= codepoint <= ord("9"):
+            converted.append(chr(0x1D7EC + codepoint - ord("0")))
+        else:
+            converted.append(character)
+    return "".join(converted)
 
 
 def refresh_private_video_metadata(*, repository: str, issue_number: int) -> None:
