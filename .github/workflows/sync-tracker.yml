@@ -1,0 +1,37 @@
+name: Talkivana — sync video tracker
+
+on:
+  schedule:
+    - cron: "41 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: read
+
+concurrency:
+  group: talkivana-video-tracker
+  cancel-in-progress: false
+
+jobs:
+  tracker:
+    name: Rebuild approval, publishing, and analytics tracker
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.TALKIVANA_DAILY_AUTOMATION == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e .
+      - name: Rebuild repository tracker from authoritative sources
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: python -m language_video_automation sync-tracker --repo "$GITHUB_REPOSITORY"

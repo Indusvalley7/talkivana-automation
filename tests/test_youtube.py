@@ -77,6 +77,30 @@ class _MetadataService:
         return self.resource
 
 
+class _StatusVideosResource:
+    def __init__(self):
+        self.calls = []
+
+    def list(self, **kwargs):
+        self.calls.append(kwargs)
+        items = [
+            {
+                "id": video_id,
+                "status": {"privacyStatus": "public", "uploadStatus": "processed"},
+            }
+            for video_id in kwargs["id"].split(",")
+        ]
+        return _Request({"items": items})
+
+
+class _StatusService:
+    def __init__(self):
+        self.resource = _StatusVideosResource()
+
+    def videos(self):
+        return self.resource
+
+
 class YouTubeAccessTests(unittest.TestCase):
     def test_preflight_confirms_the_expected_channel_and_playlist(self):
         uploader = YouTubeUploader.__new__(YouTubeUploader)
@@ -112,6 +136,14 @@ class YouTubeAccessTests(unittest.TestCase):
         self.assertEqual(body["snippet"]["title"], "Booking a Doctor's Appointment")
         self.assertEqual(body["snippet"]["tags"], ["German", "Talkivana"])
         self.assertNotIn("status", body)
+
+    def test_publication_status_lookup_batches_more_than_fifty_videos(self):
+        uploader = YouTubeUploader.__new__(YouTubeUploader)
+        uploader.service = _StatusService()
+        statuses = uploader.publication_statuses([f"video-{index}" for index in range(51)])
+        self.assertEqual(len(statuses), 51)
+        self.assertEqual(len(uploader.service.resource.calls), 2)
+        self.assertEqual(statuses["video-50"]["privacy_status"], "public")
 
 
 if __name__ == "__main__":

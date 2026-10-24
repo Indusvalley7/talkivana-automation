@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .analytics import run_timing_agent
 from .config import load_config
+from .tracker import sync_video_tracker
 from .pipeline import (
     authorize_event,
     classify_event,
@@ -105,6 +106,11 @@ def build_parser() -> argparse.ArgumentParser:
     reschedule.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
     reschedule.add_argument("--issue", type=int, required=True)
 
+    tracker = subparsers.add_parser(
+        "sync-tracker", help="Rebuild the repository video and analytics tracker"
+    )
+    tracker.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
+
     preflight = subparsers.add_parser("preflight", help="Validate configuration and required tools")
     preflight.add_argument("--mode", choices=("local", "github"), default="local")
 
@@ -182,6 +188,10 @@ def main(argv: list[str] | None = None) -> None:
                 repository=args.repo,
                 issue_number=args.issue,
             )
+        elif args.command == "sync-tracker":
+            _require_repo(args.repo)
+            result = sync_video_tracker(repository=args.repo)
+            print(json.dumps(result, indent=2, sort_keys=True))
         elif args.command == "preflight":
             problems = run_preflight(mode=args.mode)
             if problems:

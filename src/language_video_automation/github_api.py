@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import os
 import re
@@ -121,11 +123,51 @@ class GitHubClient:
         params = {"state": state, "per_page": "100", "sort": "created", "direction": "desc"}
         if labels:
             params["labels"] = ",".join(labels)
-        data = self._request("GET", "/issues?" + urllib.parse.urlencode(params))
-        return [Issue.from_api(item) for item in data if "pull_request" not in item]
+        result: list[Issue] = []
+        page = 1
+        while True:
+            params["page"] = str(page)
+            data = self._request("GET", "/issues?" + urllib.parse.urlencode(params))
+            result.extend(Issue.from_api(item) for item in data if "pull_request" not in item)
+            if len(data) < 100:
+                return result
+            page += 1
 
     def comment(self, number: int, body: str) -> None:
         self._request("POST", f"/issues/{number}/comments", {"body": body})
+
+    def list_comments(self, number: int) -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
+        page = 1
+        while True:
+            data = self._request(
+                "GET",
+                f"/issues/{number}/comments?per_page=100&page={page}",
+            )
+            result.extend(dict(item) for item in data)
+            if len(data) < 100:
+                return result
+            page += 1
+
+    def upsert_file(self, *, path: str, text: str, message: str) -> bool:
+        """Create or replace a UTF-8 repository file, avoiding no-op commits."""
+        encoded_path = urllib.parse.quote(path, safe="/")
+        current = self._request("GET", f"/contents/{encoded_path}", allow_404=True)
+        payload: dict[str, Any] = {
+            "message": message,
+            "content": base64.b64encode(text.encode("utf-8")).decode("ascii"),
+        }
+        if current is not None:
+            content = text.encode("utf-8")
+            expected_sha = hashlib.sha1(
+                f"blob {len(content)}\0".encode("ascii") + content,
+                usedforsecurity=False,
+            ).hexdigest()
+            if str(current.get("sha", "")) == expected_sha:
+                return False
+            payload["sha"] = str(current["sha"])
+        self._request("PUT", f"/contents/{encoded_path}", payload)
+        return True
 
     def update_issue(
         self,

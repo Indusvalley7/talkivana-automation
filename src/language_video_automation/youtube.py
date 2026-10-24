@@ -200,6 +200,31 @@ class YouTubeUploader:
         except Exception as exc:
             raise YouTubeError(f"Updating description for video {video_id} failed: {exc}") from exc
 
+    def publication_statuses(self, video_ids: list[str]) -> dict[str, dict[str, str]]:
+        """Return owner-visible publication state, batching the API's 50-video limit."""
+        clean_ids = list(dict.fromkeys(video_id for video_id in video_ids if video_id))
+        if not clean_ids:
+            return {}
+        try:
+            result: dict[str, dict[str, str]] = {}
+            for start in range(0, len(clean_ids), 50):
+                batch = clean_ids[start:start + 50]
+                response = self.service.videos().list(
+                    part="status",
+                    id=",".join(batch),
+                    maxResults=50,
+                ).execute()
+                for item in response.get("items") or []:
+                    status = item.get("status") or {}
+                    result[str(item.get("id", ""))] = {
+                        "privacy_status": str(status.get("privacyStatus", "unknown")),
+                        "upload_status": str(status.get("uploadStatus", "unknown")),
+                        "publish_at": str(status.get("publishAt", "")),
+                    }
+            return result
+        except Exception as exc:
+            raise YouTubeError(f"Reading YouTube publication status failed: {exc}") from exc
+
     def add_to_playlist(self, *, video_id: str, playlist_id: str) -> None:
         if not playlist_id:
             return
