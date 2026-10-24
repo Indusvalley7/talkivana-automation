@@ -264,27 +264,23 @@ def _render_markdown(
         + range_note,
         "The CSV file in this folder contains the complete analysis-ready history.",
         "",
-        "| No. | Video / Short | Approval | Reason | Publishing date | Published | YouTube |",
-        "|---:|---|---|---|---|---|---|",
+        "| No. | Video / Short | Description | Approval | Reason | Publishing date | Published | YouTube |",
+        "|---:|---|---|---|---|---|---|---|",
     ]
     for row in rows:
         approval = "Approved" if row["approved"] == "Yes" else (
             "Rejected" if row["rejected"] == "Yes" else "Pending"
         )
         title = row["youtube_video_or_short_name"].replace("|", "\\|")
+        description = (
+            row["content_description"]
+            .replace("|", "\\|")
+            .replace("\n", "<br>")
+        )
         reason = row["review_status_reason"].replace("|", "\\|")
         link = f"[Open]({row['youtube_url']})" if row["youtube_url"] else "—"
         lines.append(
-            f"| {row['s_no']} | {title} | {approval} | {reason} | "
+            f"| {row['s_no']} | {title} | {description} | {approval} | {reason} | "
             f"{row['publishing_date'] or '—'} | {row['successfully_published']} | {link} |"
         )
-    lines.extend(["", "## Content descriptions", ""])
-    for row in rows:
-        description = row["content_description"].replace("\n", "  \n")
-        lines.extend([
-            f"### {row['s_no']}. {row['youtube_video_or_short_name']}",
-            "",
-            description,
-            "",
-        ])
     return "\n".join(lines).rstrip() + "\n"

@@ -67,6 +67,7 @@ class TrackerTests(unittest.TestCase):
             row.update({
                 "s_no": str(index + 1),
                 "youtube_video_or_short_name": f"Video {index + 1}: Test",
+                "content_description": f"Description {index + 1}",
                 "approved": "Yes",
                 "rejected": "No",
                 "successfully_published": "No",
@@ -75,6 +76,9 @@ class TrackerTests(unittest.TestCase):
         rendered = _render_markdown(rows, total_rows=250)
         self.assertIn("Showing the newest 2 of 250 records", rendered)
         self.assertIn("complete analysis-ready history", rendered)
+        self.assertIn("| Video / Short | Description |", rendered)
+        self.assertIn("| Video 1: Test | Description 1 | Approved |", rendered)
+        self.assertNotIn("## Content descriptions", rendered)
 
 
 if __name__ == "__main__":
