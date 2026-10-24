@@ -47,6 +47,36 @@ class _AnalyticsService:
         return _Resource({"rows": []})
 
 
+class _MetadataVideosResource:
+    def __init__(self):
+        self.update_call = None
+
+    def list(self, **_kwargs):
+        return _Request({
+            "items": [{
+                "snippet": {
+                    "title": "Booking a Doctor's Appointment",
+                    "description": "Old description",
+                    "categoryId": "27",
+                    "tags": ["German", "Talkivana"],
+                    "defaultLanguage": "en",
+                }
+            }]
+        })
+
+    def update(self, **kwargs):
+        self.update_call = kwargs
+        return _Request({})
+
+
+class _MetadataService:
+    def __init__(self):
+        self.resource = _MetadataVideosResource()
+
+    def videos(self):
+        return self.resource
+
+
 class YouTubeAccessTests(unittest.TestCase):
     def test_preflight_confirms_the_expected_channel_and_playlist(self):
         uploader = YouTubeUploader.__new__(YouTubeUploader)
@@ -71,6 +101,17 @@ class YouTubeAccessTests(unittest.TestCase):
         analytics = YouTubeAnalyticsClient.__new__(YouTubeAnalyticsClient)
         analytics.service = _AnalyticsService()
         analytics.validate_access()
+
+    def test_description_update_preserves_other_snippet_metadata(self):
+        uploader = YouTubeUploader.__new__(YouTubeUploader)
+        uploader.service = _MetadataService()
+        uploader.update_description(video_id="video-1", description="New description")
+        body = uploader.service.resource.update_call["body"]
+        self.assertEqual(body["id"], "video-1")
+        self.assertEqual(body["snippet"]["description"], "New description")
+        self.assertEqual(body["snippet"]["title"], "Booking a Doctor's Appointment")
+        self.assertEqual(body["snippet"]["tags"], ["German", "Talkivana"])
+        self.assertNotIn("status", body)
 
 
 if __name__ == "__main__":

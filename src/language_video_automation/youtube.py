@@ -171,6 +171,35 @@ class YouTubeUploader:
         except Exception as exc:
             raise YouTubeError(f"Scheduling video {video_id} failed: {exc}") from exc
 
+    def update_description(self, *, video_id: str, description: str) -> None:
+        """Replace only a video's description while preserving its other snippet metadata."""
+        try:
+            response = self.service.videos().list(
+                part="snippet",
+                id=video_id,
+                maxResults=1,
+            ).execute()
+            items = response.get("items") or []
+            if len(items) != 1:
+                raise YouTubeError(f"YouTube video {video_id} was not found.")
+            current = dict(items[0].get("snippet") or {})
+            snippet: dict[str, Any] = {
+                "title": str(current.get("title", ""))[:100],
+                "description": description[:5000],
+                "categoryId": str(current.get("categoryId", "27")),
+            }
+            for key in ("tags", "defaultLanguage", "defaultAudioLanguage"):
+                if current.get(key):
+                    snippet[key] = current[key]
+            self.service.videos().update(
+                part="snippet",
+                body={"id": video_id, "snippet": snippet},
+            ).execute()
+        except YouTubeError:
+            raise
+        except Exception as exc:
+            raise YouTubeError(f"Updating description for video {video_id} failed: {exc}") from exc
+
     def add_to_playlist(self, *, video_id: str, playlist_id: str) -> None:
         if not playlist_id:
             return

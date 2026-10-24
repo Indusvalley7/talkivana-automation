@@ -35,6 +35,8 @@ class SchedulingTests(unittest.TestCase):
         )
         self.assertEqual(plan.stage, 1)
         self.assertEqual(len({slot for _, slot in plan.assignments}), 4)
+        assignments = dict(plan.assignments)
+        self.assertNotEqual(assignments["long-1"], assignments["long-2"])
 
     def test_later_stage_scores_formats_separately(self):
         samples = [
@@ -57,4 +59,3 @@ class SchedulingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

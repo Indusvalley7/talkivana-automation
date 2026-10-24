@@ -14,6 +14,8 @@
   characters than approved voices, stop before rendering instead of reusing or inventing a voice.
 - Never stretch or slow German audio in a way that changes pronunciation.
 - Use Standard German used in Germany. Do not use dialect spellings or regional dialect lessons.
+- Every long-video YouTube description uses the approved channel template. Only the lesson-topic
+  and situation placeholders may change, and both are derived from the approved video heading.
 - Build progressive, original, practical situations for absolute beginners.
 - Make each scenario, objective, wording, and learning progression materially distinct.
 - Avoid recent vocabulary unless deliberate review is named and pedagogically useful.

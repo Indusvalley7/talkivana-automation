@@ -182,6 +182,7 @@
     "default_language": "en",
     "made_for_kids": false,
     "contains_synthetic_media": true,
+    "long_description_template": "Welcome to **Talkivana** — a friendly place to learn how people actually speak in everyday life.\n\nIn today’s beginner-friendly lesson, we’ll practise **{lesson_topic}**. You’ll hear useful phrases, follow a natural conversation, and get time to listen and repeat at your own pace.\n\nDon’t worry about understanding everything immediately. Listen more than once, speak along with the video, and let your confidence grow one conversation at a time.\n\nIn this lesson, you’ll learn:\n• Useful phrases for **{situation}**\n• Natural pronunciation and responses\n• Vocabulary you can use in real conversations\n• How to speak with greater confidence\n\nIf this lesson helped you, subscribe to **Talkivana** for more simple conversations for everyday, professional, and academic situations.\n\n💬 What situation would you like us to cover next? Share it in the comments.\n\n**Talkivana — Real Conversations. Clear Language.**\n\n#LanguageLearning #BeginnerLanguageLessons #EverydayConversation #SpeakingPractice #Talkivana",
     "timezone": "Asia/Kolkata",
     "minimum_lead_hours": 18,
     "seed_publish_slots_local": ["07:30", "12:30", "18:00", "22:30"],

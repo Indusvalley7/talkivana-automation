@@ -332,9 +332,12 @@ def publish_production_previews(
             continue
         result = results[asset_id][0]
         content = asset_content[asset_id]
-        description = (
-            f"{content['description']}\n\n{config.raw['channel']['description_footer']}\n"
-            f"Pack ID: {record.pack_id}\nAsset ID: {asset_id}"
+        description = build_youtube_description(
+            kind=result.kind,
+            content=content,
+            config=config,
+            pack_id=record.pack_id,
+            asset_id=asset_id,
         )
         tags = list(dict.fromkeys([*content.get("tags", []), *youtube.get("tags", [])]))
         uploaded = uploader.upload_private(
@@ -643,9 +646,12 @@ def _produce_private_previews(
             if result.asset_id in existing_assets:
                 continue
             content = asset_content[result.asset_id]
-            description = (
-                f"{content['description']}\n\n{config.raw['channel']['description_footer']}\n"
-                f"Pack ID: {record.pack_id}\nAsset ID: {result.asset_id}"
+            description = build_youtube_description(
+                kind=result.kind,
+                content=content,
+                config=config,
+                pack_id=record.pack_id,
+                asset_id=result.asset_id,
             )
             tags = list(dict.fromkeys([*content.get("tags", []), *youtube.get("tags", [])]))
             uploaded = uploader.upload_private(
@@ -763,6 +769,8 @@ def _schedule_approved_pack(
             actual_slots[asset_id] = chosen
             occupied.add(chosen)
         reservations[target_date] = occupied
+    if actual_slots["long-1"] == actual_slots["long-2"]:
+        raise PipelineError("The two long videos must use different publishing times.")
     uploader = YouTubeUploader()
     youtube = config.raw["youtube"]
     playlist = _playlist_for_record(config, record)
@@ -831,6 +839,76 @@ def cleanup_rejected_previews(*, repository: str) -> int:
         github.update_issue(issue.number, body=write_upload_manifest(issue.body, manifest))
         github.comment(issue.number, "Expired rejected private previews were deleted automatically.")
     return deleted
+
+
+def build_youtube_description(
+    *,
+    kind: str,
+    content: dict[str, Any],
+    config: AppConfig,
+    pack_id: str,
+    asset_id: str,
+) -> str:
+    if kind == "long":
+        heading = str(content["title"]).strip().rstrip(".")
+        topic = heading.lower()
+        template = str(config.raw["youtube"]["long_description_template"])
+        return template.format(lesson_topic=topic, situation=topic)
+    return (
+        f"{content['description']}\n\n{config.raw['channel']['description_footer']}\n"
+        f"Pack ID: {pack_id}\nAsset ID: {asset_id}"
+    )
+
+
+def refresh_private_video_metadata(*, repository: str, issue_number: int) -> None:
+    """Refresh long-video descriptions without rendering, uploading, or scheduling videos."""
+    config = load_config(require_enabled=True)
+    github = GitHubClient(repository)
+    issue = github.get_issue(issue_number)
+    if "pack-awaiting-video" not in issue.labels:
+        raise PipelineError(
+            f"Issue #{issue_number} is not waiting at the private-video approval gate."
+        )
+    record = parse_pack_record(issue.body)
+    _validate_record_again(record, config)
+    manifest = read_upload_manifest(issue.body)
+    assets = dict(manifest.get("assets", {}))
+    if set(assets) != {"short-1", "short-2", "long-1", "long-2"}:
+        raise PipelineError("Metadata refresh requires the complete four-video private manifest.")
+
+    content_by_id = _assets_by_id(record)
+    uploader = YouTubeUploader()
+    updated_at = datetime.now(timezone.utc).isoformat()
+    updated_lines: list[str] = []
+    for asset_id in ("long-1", "long-2"):
+        value = assets[asset_id]
+        description = build_youtube_description(
+            kind="long",
+            content=content_by_id[asset_id],
+            config=config,
+            pack_id=record.pack_id,
+            asset_id=asset_id,
+        )
+        uploader.update_description(
+            video_id=str(value["video_id"]),
+            description=description,
+        )
+        value["description_updated_at"] = updated_at
+        updated_lines.append(f"- {asset_id} — {value['title']}: {value['url']}")
+
+    manifest["assets"] = assets
+    latest = github.get_issue(issue_number)
+    github.update_issue(
+        issue_number,
+        body=write_upload_manifest(latest.body, manifest),
+    )
+    github.comment(
+        issue_number,
+        "## Long-video descriptions updated\n\n"
+        + "\n".join(updated_lines)
+        + "\n\nOnly the descriptions changed. All four videos remain private and unscheduled. "
+        "Review the descriptions, then reply with `APPROVE VIDEO` when the complete pack is ready.",
+    )
 
 
 def _assets_by_id(record: ContentPackRecord) -> dict[str, dict[str, Any]]:

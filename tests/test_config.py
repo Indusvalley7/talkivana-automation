@@ -63,6 +63,12 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ConfigurationError):
             self.write(data)
 
+    def test_long_description_template_requires_both_dynamic_fields(self):
+        data = copy.deepcopy(self.base)
+        data["youtube"]["long_description_template"] = "Only {lesson_topic} is present."
+        with self.assertRaises(ConfigurationError):
+            self.write(data)
+
     def test_unknown_dry_run_asset_is_rejected(self):
         data = copy.deepcopy(self.base)
         data["system"]["dry_run_asset_id"] = "long-99"

@@ -16,6 +16,7 @@ from .pipeline import (
     prepare_production_event,
     process_approval_event,
     publish_production_previews,
+    refresh_private_video_metadata,
     report_production_failure,
     render_chatterbox_demo,
     render_demo,
@@ -91,6 +92,12 @@ def build_parser() -> argparse.ArgumentParser:
     timing.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
     timing.add_argument("--report", action="store_true", help="Post the weekly human-readable report")
 
+    metadata = subparsers.add_parser(
+        "refresh-metadata", help="Apply approved descriptions to existing private long videos"
+    )
+    metadata.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
+    metadata.add_argument("--issue", type=int, required=True)
+
     preflight = subparsers.add_parser("preflight", help="Validate configuration and required tools")
     preflight.add_argument("--mode", choices=("local", "github"), default="local")
 
@@ -156,6 +163,12 @@ def main(argv: list[str] | None = None) -> None:
                 report=args.report,
             )
             print(json.dumps(data.get("current_plan", {}), indent=2, sort_keys=True))
+        elif args.command == "refresh-metadata":
+            _require_repo(args.repo)
+            refresh_private_video_metadata(
+                repository=args.repo,
+                issue_number=args.issue,
+            )
         elif args.command == "preflight":
             problems = run_preflight(mode=args.mode)
             if problems:

@@ -142,6 +142,13 @@ def _validate_shape(raw: dict[str, Any]) -> None:
     minimum_gap = int(raw["youtube"].get("minimum_slot_gap_minutes", 0))
     if min(circular_gaps) < minimum_gap:
         raise ConfigurationError("Publishing slots are too close together.")
+    long_description_template = str(raw["youtube"].get("long_description_template", ""))
+    if not all(token in long_description_template for token in ("{lesson_topic}", "{situation}")):
+        raise ConfigurationError(
+            "youtube.long_description_template must contain lesson_topic and situation placeholders."
+        )
+    if len(long_description_template) > 4500:
+        raise ConfigurationError("youtube.long_description_template is too long.")
     try:
         ZoneInfo(str(raw["youtube"]["timezone"]))
     except ZoneInfoNotFoundError as exc:
