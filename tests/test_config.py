@@ -18,7 +18,7 @@ class ConfigTests(unittest.TestCase):
         path.write_text(json.dumps(data), encoding="utf-8")
         return load_config(path)
 
-    def test_checked_in_configuration_is_ready_for_manual_dry_run(self):
+    def test_checked_in_configuration_is_ready_for_manual_private_production(self):
         config = load_config()
         self.assertTrue(config.enabled)
         validate_production_config(config)
@@ -69,11 +69,14 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ConfigurationError):
             self.write(data)
 
-    def test_controlled_dry_run_selects_only_one_asset(self):
+    def test_private_production_selects_all_four_assets(self):
         from language_video_automation.pipeline import _production_asset_ids
 
         config = load_config()
-        self.assertEqual(_production_asset_ids(config), ("long-1",))
+        self.assertEqual(
+            _production_asset_ids(config),
+            ("short-1", "short-2", "long-1", "long-2"),
+        )
 
 
 if __name__ == "__main__":
