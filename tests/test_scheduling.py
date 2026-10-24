@@ -1,3 +1,4 @@
+import json
 import unittest
 from datetime import date, datetime, timezone
 
@@ -7,6 +8,14 @@ from language_video_automation.scheduling import (
     next_publish_time,
     timing_stage,
 )
+from language_video_automation.config import load_config, project_root
+from language_video_automation.models import ContentPackRecord
+from language_video_automation.pipeline import _build_earliest_pack_schedule
+
+
+class _NoScheduledPacks:
+    def list_issues(self, **_kwargs):
+        return []
 
 
 class SchedulingTests(unittest.TestCase):
@@ -55,6 +64,36 @@ class SchedulingTests(unittest.TestCase):
         )
         short_score = next(item for item in plan.scores if item.format == "short" and item.slot_local == "07:30")
         self.assertEqual(short_score.confidence, "sufficient")
+
+    def test_earliest_pack_schedule_uses_next_safe_day_instead_of_seven_day_delay(self):
+        record = ContentPackRecord.from_dict(json.loads(
+            (project_root() / "tests" / "fixtures" / "sample_pack.json").read_text(
+                encoding="utf-8"
+            )
+        ))
+        short_date, long_date, slots, publish_times = _build_earliest_pack_schedule(
+            github=_NoScheduledPacks(),
+            config=load_config(),
+            record=record,
+            slot_by_asset={
+                "short-1": "22:30",
+                "short-2": "12:30",
+                "long-1": "07:30",
+                "long-2": "18:00",
+            },
+            now=datetime(2026, 10, 24, 11, 15, tzinfo=timezone.utc),
+        )
+        self.assertEqual(short_date, date(2026, 10, 25))
+        self.assertEqual(long_date, date(2026, 10, 26))
+        self.assertEqual(len(set(slots.values())), 4)
+        self.assertEqual(
+            publish_times["short-2"],
+            datetime(2026, 10, 25, 7, 0, tzinfo=timezone.utc),
+        )
+        self.assertEqual(
+            publish_times["long-1"],
+            datetime(2026, 10, 26, 2, 0, tzinfo=timezone.utc),
+        )
 
 
 if __name__ == "__main__":

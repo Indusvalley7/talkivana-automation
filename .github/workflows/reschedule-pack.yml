@@ -1,0 +1,42 @@
+name: Talkivana — reschedule approved pack
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Scheduled pack issue to move to the earliest safe dates"
+        required: true
+        default: "1"
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: talkivana-reschedule-${{ inputs.issue_number }}
+  cancel-in-progress: false
+
+jobs:
+  reschedule:
+    name: Move private videos to the corrected rolling schedule
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -e .
+      - name: Apply earliest-safe dates without re-uploading
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python -m language_video_automation reschedule-pack
+          --repo "$GITHUB_REPOSITORY"
+          --issue "${{ inputs.issue_number }}"

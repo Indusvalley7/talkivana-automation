@@ -6,6 +6,7 @@ import shutil
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from .analytics import YouTubeAnalyticsClient, current_timing_assignments
 from .approvals import ApprovalCommand, Decision, is_authorized, parse_approval_command
@@ -748,29 +749,12 @@ def _schedule_approved_pack(
     else:
         slot_by_asset = dict(plan.assignments)
         timing_explanation = plan.explanation
-    buffer_days = int(config.raw["approval"]["rolling_buffer_days"])
-    lead_days = int(config.raw["content"]["vocabulary_lead_days"])
-    short_date = _next_available_short_date(github, record, buffer_days)
-    long_date = short_date + timedelta(days=lead_days)
-    seed_slots = list(config.raw["youtube"]["seed_publish_slots_local"])
-    reservations = _reserved_slots_by_date(github)
-    actual_slots: dict[str, str] = {}
-    for target_date, asset_ids in (
-        (short_date, ("short-1", "short-2")),
-        (long_date, ("long-1", "long-2")),
-    ):
-        occupied = set(reservations.get(target_date, set()))
-        for asset_id in asset_ids:
-            preferred = slot_by_asset[asset_id]
-            available = [slot for slot in seed_slots if slot not in occupied]
-            if not available:
-                raise PipelineError(f"No unoccupied Talkivana slot remains on {target_date}.")
-            chosen = preferred if preferred in available else available[0]
-            actual_slots[asset_id] = chosen
-            occupied.add(chosen)
-        reservations[target_date] = occupied
-    if actual_slots["long-1"] == actual_slots["long-2"]:
-        raise PipelineError("The two long videos must use different publishing times.")
+    short_date, long_date, actual_slots, publish_times = _build_earliest_pack_schedule(
+        github=github,
+        config=config,
+        record=record,
+        slot_by_asset=slot_by_asset,
+    )
     uploader = YouTubeUploader()
     youtube = config.raw["youtube"]
     playlist = _playlist_for_record(config, record)
@@ -782,13 +766,7 @@ def _schedule_approved_pack(
                 f"- {asset_id}: `{value['scheduled_at']}` — {value['url']} (already confirmed)"
             )
             continue
-        target_date = short_date if asset_id.startswith("short") else long_date
-        publish_at = next_publish_time(
-            timezone_name=str(youtube["timezone"]),
-            local_time=actual_slots[asset_id],
-            minimum_lead_hours=int(youtube["minimum_lead_hours"]),
-            not_before_date=target_date,
-        )
+        publish_at = publish_times[asset_id]
         uploader.schedule_existing(
             video_id=str(value["video_id"]),
             publish_at=publish_at,
@@ -839,6 +817,67 @@ def cleanup_rejected_previews(*, repository: str) -> int:
         github.update_issue(issue.number, body=write_upload_manifest(issue.body, manifest))
         github.comment(issue.number, "Expired rejected private previews were deleted automatically.")
     return deleted
+
+
+def reschedule_pack_earliest(*, repository: str, issue_number: int) -> None:
+    """Move one still-private scheduled pack to the earliest safe rolling dates."""
+    config = load_config(require_enabled=True)
+    github = GitHubClient(repository)
+    issue = github.get_issue(issue_number)
+    if "pack-scheduled" not in issue.labels:
+        raise PipelineError(f"Issue #{issue_number} is not a scheduled Talkivana pack.")
+    record = parse_pack_record(issue.body)
+    _validate_record_again(record, config)
+    manifest = read_upload_manifest(issue.body)
+    assets = dict(manifest.get("assets", {}))
+    expected = {"short-1", "short-2", "long-1", "long-2"}
+    if set(assets) != expected:
+        raise PipelineError("Rescheduling requires the complete four-video manifest.")
+    slot_by_asset = {
+        asset_id: str(assets[asset_id].get("slot_local", ""))
+        for asset_id in expected
+    }
+    if any(not slot for slot in slot_by_asset.values()):
+        raise PipelineError("Rescheduling requires the existing experimental slots.")
+
+    short_date, long_date, actual_slots, publish_times = _build_earliest_pack_schedule(
+        github=github,
+        config=config,
+        record=record,
+        slot_by_asset=slot_by_asset,
+        exclude_issue_number=issue_number,
+    )
+    uploader = YouTubeUploader()
+    youtube = config.raw["youtube"]
+    lines: list[str] = []
+    zone = ZoneInfo(str(youtube["timezone"]))
+    for asset_id in ("short-1", "short-2", "long-1", "long-2"):
+        value = assets[asset_id]
+        publish_at = publish_times[asset_id]
+        uploader.schedule_existing(
+            video_id=str(value["video_id"]),
+            publish_at=publish_at,
+            made_for_kids=bool(youtube["made_for_kids"]),
+            contains_synthetic_media=bool(youtube["contains_synthetic_media"]),
+        )
+        value["scheduled_at"] = publish_at.isoformat()
+        value["slot_local"] = actual_slots[asset_id]
+        local_label = publish_at.astimezone(zone).strftime("%d %B %Y, %I:%M %p %Z")
+        lines.append(f"- {asset_id}: **{local_label}** — {value['url']}")
+
+    manifest["assets"] = assets
+    latest = github.get_issue(issue_number)
+    github.update_issue(
+        issue_number,
+        body=write_upload_manifest(latest.body, manifest),
+    )
+    github.comment(
+        issue_number,
+        "## Schedule moved to the earliest safe dates\n\n"
+        + "\n".join(lines)
+        + f"\n\nShorts lead their linked long lessons by {(long_date - short_date).days} day. "
+        "All four experimental times remain different.",
+    )
 
 
 def build_youtube_description(
@@ -944,13 +983,20 @@ def _next_available_short_date(
     github: GitHubClient,
     record: ContentPackRecord,
     buffer_days: int,
+    *,
+    exclude_issue_number: int | None = None,
+    not_before: date | None = None,
+    base_date: date | None = None,
 ) -> date:
     candidate = max(
-        date.today() + timedelta(days=buffer_days),
+        (base_date or date.today()) + timedelta(days=buffer_days),
         date.fromisoformat(record.created_date) + timedelta(days=buffer_days),
+        not_before or date.min,
     )
     used: set[date] = set()
     for other in github.list_issues(state="closed", labels=["talkivana", "pack-scheduled"]):
+        if other.number == exclude_issue_number:
+            continue
         for asset_id, asset in read_upload_manifest(other.body).get("assets", {}).items():
             if not str(asset_id).startswith("short") or not asset.get("scheduled_at"):
                 continue
@@ -960,9 +1006,15 @@ def _next_available_short_date(
     return candidate
 
 
-def _reserved_slots_by_date(github: GitHubClient) -> dict[date, set[str]]:
+def _reserved_slots_by_date(
+    github: GitHubClient,
+    *,
+    exclude_issue_number: int | None = None,
+) -> dict[date, set[str]]:
     reservations: dict[date, set[str]] = {}
     for other in github.list_issues(state="closed", labels=["talkivana", "pack-scheduled"]):
+        if other.number == exclude_issue_number:
+            continue
         for asset in read_upload_manifest(other.body).get("assets", {}).values():
             scheduled = str(asset.get("scheduled_at", ""))
             slot = str(asset.get("slot_local", ""))
@@ -971,6 +1023,88 @@ def _reserved_slots_by_date(github: GitHubClient) -> dict[date, set[str]]:
             day = datetime.fromisoformat(scheduled.replace("Z", "+00:00")).date()
             reservations.setdefault(day, set()).add(slot)
     return reservations
+
+
+def _build_earliest_pack_schedule(
+    *,
+    github: GitHubClient,
+    config: AppConfig,
+    record: ContentPackRecord,
+    slot_by_asset: dict[str, str],
+    exclude_issue_number: int | None = None,
+    now: datetime | None = None,
+) -> tuple[date, date, dict[str, str], dict[str, datetime]]:
+    youtube = config.raw["youtube"]
+    timezone_name = str(youtube["timezone"])
+    zone = ZoneInfo(timezone_name)
+    minimum_lead_hours = int(youtube["minimum_lead_hours"])
+    buffer_days = int(config.raw["approval"]["rolling_buffer_days"])
+    lead_days = int(config.raw["content"]["vocabulary_lead_days"])
+    seed_slots = list(youtube["seed_publish_slots_local"])
+    scheduling_now = now or datetime.now(timezone.utc)
+    reservations = _reserved_slots_by_date(
+        github,
+        exclude_issue_number=exclude_issue_number,
+    )
+    candidate = _next_available_short_date(
+        github,
+        record,
+        buffer_days,
+        exclude_issue_number=exclude_issue_number,
+        base_date=scheduling_now.astimezone(zone).date(),
+    )
+
+    for _attempt in range(370):
+        short_date = candidate
+        long_date = short_date + timedelta(days=lead_days)
+        actual_slots: dict[str, str] = {}
+        allocation_failed = False
+        for target_date, asset_ids in (
+            (short_date, ("short-1", "short-2")),
+            (long_date, ("long-1", "long-2")),
+        ):
+            occupied = set(reservations.get(target_date, set()))
+            for asset_id in asset_ids:
+                preferred = slot_by_asset[asset_id]
+                available = [slot for slot in seed_slots if slot not in occupied]
+                if not available:
+                    allocation_failed = True
+                    break
+                chosen = preferred if preferred in available else available[0]
+                actual_slots[asset_id] = chosen
+                occupied.add(chosen)
+            if allocation_failed:
+                break
+
+        if not allocation_failed:
+            publish_times: dict[str, datetime] = {}
+            dates_match = True
+            for asset_id in ("short-1", "short-2", "long-1", "long-2"):
+                target_date = short_date if asset_id.startswith("short") else long_date
+                publish_at = next_publish_time(
+                    timezone_name=timezone_name,
+                    local_time=actual_slots[asset_id],
+                    minimum_lead_hours=minimum_lead_hours,
+                    now=scheduling_now,
+                    not_before_date=target_date,
+                )
+                publish_times[asset_id] = publish_at
+                if publish_at.astimezone(zone).date() != target_date:
+                    dates_match = False
+            if dates_match:
+                if actual_slots["long-1"] == actual_slots["long-2"]:
+                    raise PipelineError("The two long videos must use different publishing times.")
+                return short_date, long_date, actual_slots, publish_times
+
+        candidate = _next_available_short_date(
+            github,
+            record,
+            buffer_days,
+            exclude_issue_number=exclude_issue_number,
+            not_before=candidate + timedelta(days=1),
+            base_date=scheduling_now.astimezone(zone).date(),
+        )
+    raise PipelineError("No safe Talkivana publishing dates were available within one year.")
 
 
 def _playlist_for_record(config: AppConfig, record: ContentPackRecord):

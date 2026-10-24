@@ -18,6 +18,7 @@ from .pipeline import (
     publish_production_previews,
     refresh_private_video_metadata,
     report_production_failure,
+    reschedule_pack_earliest,
     render_chatterbox_demo,
     render_demo,
     run_production_assembly_job,
@@ -98,6 +99,12 @@ def build_parser() -> argparse.ArgumentParser:
     metadata.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
     metadata.add_argument("--issue", type=int, required=True)
 
+    reschedule = subparsers.add_parser(
+        "reschedule-pack", help="Move a private scheduled pack to the earliest safe dates"
+    )
+    reschedule.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
+    reschedule.add_argument("--issue", type=int, required=True)
+
     preflight = subparsers.add_parser("preflight", help="Validate configuration and required tools")
     preflight.add_argument("--mode", choices=("local", "github"), default="local")
 
@@ -166,6 +173,12 @@ def main(argv: list[str] | None = None) -> None:
         elif args.command == "refresh-metadata":
             _require_repo(args.repo)
             refresh_private_video_metadata(
+                repository=args.repo,
+                issue_number=args.issue,
+            )
+        elif args.command == "reschedule-pack":
+            _require_repo(args.repo)
+            reschedule_pack_earliest(
                 repository=args.repo,
                 issue_number=args.issue,
             )

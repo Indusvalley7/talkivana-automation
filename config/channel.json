@@ -13,7 +13,7 @@
     "approver_login": "Indusvalley7",
     "quick_preview_seconds": 30,
     "rejected_preview_retention_days": 14,
-    "rolling_buffer_days": 7
+    "rolling_buffer_days": 0
   },
   "channel": {
     "name": "Talkivana",
