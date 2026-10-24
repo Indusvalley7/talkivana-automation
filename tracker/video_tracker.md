@@ -9,10 +9,10 @@ The CSV file in this folder contains the complete analysis-ready history.
 | 2 | Short 2: Essential Weather Words | Approved | Final videos approved; publication scheduled. | 2026-10-25T12:30+05:30 | No | [Open](https://youtu.be/y6ACaua1hRc) |
 | 3 | Video 1: Booking a Doctor's Appointment | Approved | Final videos approved; publication scheduled. | 2026-10-26T07:30+05:30 | No | [Open](https://youtu.be/sq0YM4zspPU) |
 | 4 | Video 2: Talking About the Weather Before Leaving | Approved | Final videos approved; publication scheduled. | 2026-10-26T18:00+05:30 | No | [Open](https://youtu.be/-ph0pjMhgEM) |
-| 5 | Short 1: Essential Restaurant Words in German | Pending | Status pending; see the linked GitHub Issue. | — | No | — |
-| 6 | Short 2: Essential Neighbourhood Words in German | Pending | Status pending; see the linked GitHub Issue. | — | No | — |
-| 7 | Video 1: At the Restaurant: Ordering a Table and Water | Pending | Status pending; see the linked GitHub Issue. | — | No | — |
-| 8 | Video 2: Meeting a Neighbour in the Hallway | Pending | Status pending; see the linked GitHub Issue. | — | No | — |
+| 5 | Short 1: Essential Restaurant Words in German | Rejected | Closed because this was an unintended new lesson pack. The authorized four-video private test will reuse the previously approved Appointments and Weather pack in Issue #1. Nothing from this issue was rendered or uploaded. | — | No | — |
+| 6 | Short 2: Essential Neighbourhood Words in German | Rejected | Closed because this was an unintended new lesson pack. The authorized four-video private test will reuse the previously approved Appointments and Weather pack in Issue #1. Nothing from this issue was rendered or uploaded. | — | No | — |
+| 7 | Video 1: At the Restaurant: Ordering a Table and Water | Rejected | Closed because this was an unintended new lesson pack. The authorized four-video private test will reuse the previously approved Appointments and Weather pack in Issue #1. Nothing from this issue was rendered or uploaded. | — | No | — |
+| 8 | Video 2: Meeting a Neighbour in the Hallway | Rejected | Closed because this was an unintended new lesson pack. The authorized four-video private test will reuse the previously approved Appointments and Weather pack in Issue #1. Nothing from this issue was rendered or uploaded. | — | No | — |
 
 ## Content descriptions
 
