@@ -57,6 +57,9 @@ scene. Rewrite the dialogue unless every requirement below passes:
 - Use both speakers purposefully and alternate A/B exactly. Speaker A starts each 12-turn scene.
 - Make the linked Short vocabulary genuinely useful to the scene and include it without forcing
   unnatural wording.
+- Treat each vocabulary item's `german` value as the exact teachable surface form. It must appear
+  as one contiguous phrase in the linked dialogue, including any article or inflection stored in
+  that field. If this would sound unnatural, choose a different focus form before finalising.
 
 ## Standard German checks
 

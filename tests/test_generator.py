@@ -25,6 +25,28 @@ class _FakeGeminiClient:
         }
 
 
+class _RepairingGeminiClient(_FakeGeminiClient):
+    def generate_json(self, **kwargs):
+        self.calls += 1
+        self.prompts.append(kwargs["prompt"])
+        if self.calls == 1:
+            return copy.deepcopy(self.pack)
+        if self.calls == 2:
+            invalid = copy.deepcopy(self.pack)
+            for turn in invalid["long_videos"][1]["dialogue"]:
+                turn["german"] = turn["german"].replace("Kaffee", "Tee")
+            return {
+                "approved": False,
+                "problems": [],
+                "corrected_pack": invalid,
+            }
+        return {
+            "approved": True,
+            "problems": ["Restored the exact linked vocabulary in natural context."],
+            "corrected_pack": copy.deepcopy(self.pack),
+        }
+
+
 class GeneratorTests(unittest.TestCase):
     def test_configuration_owned_metadata_is_normalized_before_approval(self):
         fixture = json.loads(
@@ -73,6 +95,27 @@ class GeneratorTests(unittest.TestCase):
             self.assertIn("Do not mix `du` and `Sie`", prompt)
         self.assertIn("spaced-repetition recycling", client.prompts[0])
         self.assertIn("read the German dialogue from first to last", client.prompts[1])
+
+    def test_validation_failure_gets_one_bounded_tutor_repair(self):
+        fixture = json.loads(
+            (project_root() / "tests" / "fixtures" / "sample_pack.json").read_text(
+                encoding="utf-8"
+            )
+        )["content"]
+        config = load_config()
+        client = _RepairingGeminiClient(fixture)
+        record = ContentPackGenerator(config, client).create(
+            playlist=config.active_playlists[0],
+            history=[],
+            today=date(2026, 10, 25),
+        )
+
+        self.assertEqual(client.calls, 3)
+        self.assertIn("does not use linked vocabulary term", client.prompts[2])
+        self.assertIn("exact contiguous case-insensitive phrase", client.prompts[2])
+        self.assertTrue(
+            any("Deterministic validation repair" in item for item in record.qa_problems)
+        )
 
 
 if __name__ == "__main__":

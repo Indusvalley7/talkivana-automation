@@ -9,6 +9,7 @@ from .models import (
     CONTENT_PACK_JSON_SCHEMA,
     QA_JSON_SCHEMA,
     ContentPackRecord,
+    ContentValidationError,
     build_pack_record,
     recent_vocabulary,
     validate_content_pack,
@@ -66,6 +67,8 @@ Non-negotiable configuration:
 - Topics, in pair order: {json.dumps(topics, ensure_ascii=False)}
 - Pronunciation: simplified English spelling, never IPA
 - Every linked Short vocabulary item must appear verbatim in its long video's German dialogue
+- "Verbatim" means the exact `german` field as one contiguous, case-insensitive phrase. Choose a
+  vocabulary form that can occur naturally in the scene, then include that exact form in a line.
 - Each dialogue turn is spoken later as English once, German once, then German repeated once
 - After the teaching sequence, replay the complete coherent conversation in German only, once
 - Each conversation must progress naturally so the final German-only pass works as a single scene
@@ -130,11 +133,17 @@ Pack:
         if not isinstance(corrected, dict):
             raise ValueError("QA response did not contain corrected_pack.")
         self._apply_fixed_fields(corrected, playlist)
-        self._validate(corrected, playlist)
+        qa_problems = [str(item) for item in qa.get("problems", [])]
+        corrected, repair_problems = self._repair_validation_errors(
+            corrected,
+            playlist=playlist,
+            maximum_attempts=2,
+        )
+        qa_problems.extend(repair_problems)
         return build_pack_record(
             corrected,
             revision=revision,
-            qa_problems=[str(item) for item in qa.get("problems", [])],
+            qa_problems=qa_problems,
             replacement_for=replacement_for,
             today=today,
         )
@@ -145,6 +154,60 @@ Pack:
         pack["target_language"] = playlist.target_language
         pack["language_variety"] = playlist.variety
         pack["level"] = str(self.config.raw["channel"]["level"])
+
+    def _repair_validation_errors(
+        self,
+        pack: dict,
+        *,
+        playlist: Playlist,
+        maximum_attempts: int,
+    ) -> tuple[dict, list[str]]:
+        """Give the tutor reviewer a bounded chance to repair schema-level content defects."""
+        corrected = pack
+        problems: list[str] = []
+        for attempt in range(1, maximum_attempts + 1):
+            try:
+                self._validate(corrected, playlist)
+                return corrected, problems
+            except ContentValidationError as exc:
+                if attempt == maximum_attempts:
+                    raise
+                validation_error = str(exc)
+
+            repair_prompt = f"""
+Act as the final Talkivana Language Learning Companion repair editor. The otherwise reviewed pack
+failed deterministic validation for these exact reasons:
+
+{validation_error}
+
+Return a complete corrected pack. Fix every listed defect while preserving all valid content,
+natural CEFR A1 Standard German, stable speaker roles, consistent du/Sie register, and the complete
+opening-to-resolution conversation arc. A linked vocabulary item's `german` value must occur as one
+exact contiguous case-insensitive phrase in its linked dialogue. If a selected form cannot occur
+naturally, change that vocabulary entry in both the Short and focus_vocabulary, then use the new
+exact form naturally in the dialogue. Speaker A starts and all 12 turns alternate A/B exactly.
+Record each material repair in problems. Do not merely explain the error.
+
+Guardrails:
+{self.guardrails}
+
+Pack to repair:
+{json.dumps(corrected, ensure_ascii=False, indent=2)}
+""".strip()
+            repair = self.client.generate_json(
+                model=str(self.config.raw["models"]["text"]),
+                prompt=repair_prompt,
+                schema=QA_JSON_SCHEMA,
+            )
+            replacement = repair.get("corrected_pack")
+            if not isinstance(replacement, dict):
+                raise ValueError("Validation-repair response did not contain corrected_pack.")
+            corrected = replacement
+            self._apply_fixed_fields(corrected, playlist)
+            problems.append(f"Deterministic validation repair: {validation_error}")
+            problems.extend(str(item) for item in repair.get("problems", []))
+
+        raise AssertionError("Validation repair loop ended unexpectedly.")
 
     def _validate(self, pack: dict, playlist: Playlist) -> None:
         validate_content_pack(
