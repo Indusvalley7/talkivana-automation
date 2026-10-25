@@ -184,6 +184,42 @@ def _validate_vocab(items: Any, expected_count: int, field: str, errors: list[st
     return result
 
 
+_GERMAN_ARTICLES = {
+    "der", "die", "das", "den", "dem", "des",
+    "ein", "eine", "einen", "einem", "einer", "eines",
+}
+
+
+def _german_vocabulary_used(term: str, corpus: str) -> bool:
+    """Match a taught item without rewarding grammatically artificial verbatim phrasing."""
+    word_pattern = r"[a-zäöüß]+"
+    term_words = re.findall(word_pattern, term.casefold())
+    corpus_words = set(re.findall(word_pattern, corpus.casefold()))
+    content_words = [word for word in term_words if word not in _GERMAN_ARTICLES]
+    if not content_words:
+        content_words = term_words
+
+    for word in content_words:
+        if word in corpus_words:
+            continue
+        if len(word) > 4 and word.endswith("en"):
+            stem = word[:-2]
+            conjugations = {
+                stem,
+                f"{stem}e",
+                f"{stem}st",
+                f"{stem}t",
+                f"{stem}en",
+                f"{stem}et",
+            }
+            if corpus_words.intersection(conjugations):
+                continue
+        if word.endswith("e") and f"{word}n" in corpus_words:
+            continue
+        return False
+    return bool(content_words)
+
+
 def validate_content_pack(
     pack: dict[str, Any],
     *,
@@ -304,8 +340,10 @@ def validate_content_pack(
                 f"long_videos[{index}] dialogue must start with A and alternate A/B exactly"
             )
         for term in focus_terms:
-            if term and term not in corpus:
-                errors.append(f"long_videos[{index}] does not use linked vocabulary term {term!r}")
+            if term and not _german_vocabulary_used(term, corpus):
+                errors.append(
+                    f"long_videos[{index}] does not use linked vocabulary word family {term!r}"
+                )
         tags = long_video.get("tags")
         if not isinstance(tags, list) or not 3 <= len(tags) <= 10:
             errors.append(f"long_videos[{index}].tags must contain 3 to 10 entries")

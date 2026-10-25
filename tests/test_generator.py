@@ -113,8 +113,8 @@ class GeneratorTests(unittest.TestCase):
         )
 
         self.assertEqual(client.calls, 4)
-        self.assertIn("does not use linked vocabulary term", client.prompts[2])
-        self.assertIn("exact contiguous case-insensitive phrase", client.prompts[2])
+        self.assertIn("does not use linked vocabulary word family", client.prompts[2])
+        self.assertIn("recognisable natural word-family form", client.prompts[2])
         self.assertIn("final adversarial Talkivana conversation auditor", client.prompts[3])
         self.assertTrue(
             any("Deterministic validation repair" in item for item in record.qa_problems)

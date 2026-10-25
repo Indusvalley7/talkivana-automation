@@ -77,6 +77,16 @@ class ModelTests(unittest.TestCase):
         ):
             self.validate(content)
 
+    def test_linked_vocabulary_accepts_natural_case_and_conjugation(self):
+        content = json.loads(json.dumps(self.record.content))
+        cafe = content["long_videos"][1]
+        cafe["focus_vocabulary"][0]["german"] = "der Kaffee"
+        content["shorts"][1]["vocabulary"][0]["german"] = "der Kaffee"
+        cafe["focus_vocabulary"][1]["german"] = "kosten"
+        content["shorts"][1]["vocabulary"][1]["german"] = "kosten"
+        cafe["dialogue"][5]["german"] = "Was kostet der Kaffee?"
+        self.validate(content)
+
     def test_issue_body_round_trip(self):
         restored = parse_pack_record(format_issue_body(self.record))
         self.assertEqual(restored.pack_id, self.record.pack_id)

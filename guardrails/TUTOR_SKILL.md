@@ -60,10 +60,10 @@ scene. Rewrite the dialogue unless every requirement below passes:
 - Use both speakers purposefully and alternate A/B exactly. Speaker A starts each 12-turn scene.
 - Make the linked Short vocabulary genuinely useful to the scene and include it without forcing
   unnatural wording.
-- Treat each vocabulary item's `german` value as the exact teachable surface form. It must appear
-  as one contiguous phrase in the linked dialogue, including any article or inflection stored in
-  that field. If this would sound unnatural, choose a different focus form before finalising.
-- Never turn an infinitive into an artificial noun phrase just to pass exact matching. For example,
+- Each focus item must reappear as a recognisable, natural member of the same word family in the
+  linked dialogue. Article/case changes, noun plurals, and ordinary verb conjugations are expected
+  in natural German and are preferable to repeating a dictionary form unnaturally.
+- Never turn an infinitive into an artificial noun phrase just to pass matching. For example,
   a price question and a request to pay are separate natural intentions; use a line such as
   `Ich möchte zahlen` rather than an invented construction such as `das Zahlen`.
 - Select focus vocabulary because it is central to the scenario. Each item should support a real

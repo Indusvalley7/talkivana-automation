@@ -66,9 +66,9 @@ Non-negotiable configuration:
 - Exactly {turns} alternating A/B conversation turns in each long video
 - Topics, in pair order: {json.dumps(topics, ensure_ascii=False)}
 - Pronunciation: simplified English spelling, never IPA
-- Every linked Short vocabulary item must appear verbatim in its long video's German dialogue
-- "Verbatim" means the exact `german` field as one contiguous, case-insensitive phrase. Choose a
-  vocabulary form that can occur naturally in the scene, then include that exact form in a line.
+- Every linked Short vocabulary item must reappear naturally in its long video's German dialogue.
+  Natural article/case changes, noun plurals, and ordinary verb conjugation are allowed; never
+  distort German merely to reproduce a dictionary form verbatim.
 - Each dialogue turn is spoken later as English once, German once, then German repeated once
 - After the teaching sequence, replay the complete coherent conversation in German only, once
 - Each conversation must progress naturally so the final German-only pass works as a single scene
@@ -194,9 +194,10 @@ failed deterministic validation for these exact reasons:
 Return a complete corrected pack. Fix every listed defect while preserving all valid content,
 natural CEFR A1 Standard German, stable speaker roles, consistent du/Sie register, and the complete
 opening-to-resolution conversation arc. A linked vocabulary item's `german` value must occur as one
-exact contiguous case-insensitive phrase in its linked dialogue. If a selected form cannot occur
-naturally, change that vocabulary entry in both the Short and focus_vocabulary, then use the new
-exact form naturally in the dialogue. Speaker A starts and all 12 turns alternate A/B exactly.
+recognisable natural word-family form in its linked dialogue. Article/case changes, noun plurals,
+and normal verb conjugation are valid; an unrelated word is not. If a selected item cannot occur
+naturally, change it in both the Short and focus_vocabulary and use the replacement in the scene.
+Speaker A starts and all 12 turns alternate A/B exactly.
 Record each material repair in problems. Do not merely explain the error.
 
 Guardrails:
@@ -250,7 +251,7 @@ Examples of defects that must be rewritten, not accepted:
   idiomatic Standard German question is available.
 
 If a focus item causes artificial dialogue, replace it in the Short and focus_vocabulary with a
-more central A1 item, then use the replacement exact form naturally. Preserve exactly two Shorts,
+more central A1 item, then use its natural word-family form. Preserve exactly two Shorts,
 two long lessons, three linked vocabulary items per pair, and 12 alternating A/B turns beginning
 with A. Keep the approved asset IDs and metadata fields. Return the complete corrected pack and
 record every material correction in problems. Do not return the pack unchanged unless both German
