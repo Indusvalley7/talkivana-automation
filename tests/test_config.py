@@ -81,6 +81,12 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ConfigurationError):
             self.write(data)
 
+    def test_thumbnail_design_profile_and_dimensions_are_pinned(self):
+        data = copy.deepcopy(self.base)
+        data["video"]["thumbnail"]["long_width"] = 1000
+        with self.assertRaises(ConfigurationError):
+            self.write(data)
+
     def test_private_production_selects_all_four_assets(self):
         from language_video_automation.pipeline import _production_asset_ids
 

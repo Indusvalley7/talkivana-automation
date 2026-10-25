@@ -1,0 +1,56 @@
+name: Talkivana — generate and apply thumbnails
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Optional approval Issue number; leave blank to update every uploaded Talkivana video"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: talkivana-refresh-thumbnails-${{ inputs.issue_number || 'all' }}
+  cancel-in-progress: false
+
+jobs:
+  thumbnails:
+    name: Thumbnail skill → render → technical QA → YouTube
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install renderer and German/Latin fonts
+        run: |
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update -qq
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends fonts-noto-core
+          python -m pip install --disable-pip-version-check -e .
+      - name: Apply the checked-in YouTube thumbnail design skill
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+        run: |
+          ARGS=(--repo "$GITHUB_REPOSITORY" --output build/thumbnails)
+          if [[ -n "$ISSUE_NUMBER" ]]; then
+            ARGS+=(--issue "$ISSUE_NUMBER")
+          fi
+          python -m language_video_automation refresh-thumbnails "${ARGS[@]}"
+      - name: Keep a short-lived visual audit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: talkivana-applied-thumbnails-${{ github.run_id }}
+          path: build/thumbnails/**/*.jpg
+          if-no-files-found: error
+          retention-days: 7

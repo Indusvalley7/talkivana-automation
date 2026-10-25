@@ -18,6 +18,7 @@ from .pipeline import (
     process_approval_event,
     publish_production_previews,
     refresh_private_video_metadata,
+    refresh_video_thumbnails,
     report_production_failure,
     reschedule_pack_earliest,
     render_chatterbox_demo,
@@ -99,6 +100,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     metadata.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
     metadata.add_argument("--issue", type=int, required=True)
+
+    thumbnails = subparsers.add_parser(
+        "refresh-thumbnails",
+        help="Generate and apply content-specific thumbnails to existing Talkivana uploads",
+    )
+    thumbnails.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
+    thumbnails.add_argument("--issue", type=int, default=None)
+    thumbnails.add_argument("--output", type=Path, default=Path("build/thumbnails"))
 
     reschedule = subparsers.add_parser(
         "reschedule-pack", help="Move a private scheduled pack to the earliest safe dates"
@@ -182,6 +191,14 @@ def main(argv: list[str] | None = None) -> None:
                 repository=args.repo,
                 issue_number=args.issue,
             )
+        elif args.command == "refresh-thumbnails":
+            _require_repo(args.repo)
+            result = refresh_video_thumbnails(
+                repository=args.repo,
+                issue_number=args.issue,
+                output_dir=args.output,
+            )
+            print(json.dumps(result, indent=2, sort_keys=True))
         elif args.command == "reschedule-pack":
             _require_repo(args.repo)
             reschedule_pack_earliest(

@@ -16,6 +16,7 @@ from typing import Any, Protocol
 
 from .gemini import GeminiClient
 from .models import ContentPackRecord
+from .thumbnails import render_youtube_thumbnail
 
 
 class RenderError(RuntimeError):
@@ -633,6 +634,15 @@ def render_asset(
                 pack_id=record.pack_id,
             )
             scenes.append((scene, audio_duration + segment.pause_seconds))
+        thumbnail = output_dir / f"{record.pack_id}-{asset['asset_id']}-thumbnail.jpg"
+        render_youtube_thumbnail(
+            asset=asset,
+            kind=kind,
+            pack_id=record.pack_id,
+            output_path=thumbnail,
+            root=Path(__file__).resolve().parents[2],
+            max_file_size_bytes=int(config["video"]["thumbnail"]["max_file_size_bytes"]),
+        )
     with _workflow_group(f"Assembly — {asset['asset_id']}"):
         soundtrack = output_dir / "soundtrack.wav"
         _join_audio(resolved, soundtrack)
@@ -652,8 +662,6 @@ def render_asset(
             raise RenderError(
                 f"{asset['asset_id']} duration {actual:.1f}s is outside {minimum:.0f}-{maximum:.0f}s."
             )
-        thumbnail = output_dir / "thumbnail.png"
-        shutil.copy2(scenes[0][0], thumbnail)
         preview = output_dir / f"{record.pack_id}-{asset['asset_id']}-preview.mp4"
         _make_preview(video, preview, seconds=int(config["approval"]["quick_preview_seconds"]))
     return AssetRenderResult(
@@ -704,6 +712,8 @@ def prepare_asset_voice_stage(
         "asset_id": str(asset["asset_id"]),
         "kind": kind,
         "title": str(asset["title"]),
+        "target_language": str(record.content["target_language"]),
+        "thumbnail_asset": asset,
         "tts_request_count": int(speech.request_count),
         "segments": [
             {
@@ -739,6 +749,15 @@ def prepare_asset_visual_stage(*, config: dict[str, Any], stage_dir: Path) -> No
             channel_name=str(config["channel"]["name"]),
             pack_id=str(manifest["pack_id"]),
         )
+    thumbnail = stage_dir / "thumbnail.jpg"
+    render_youtube_thumbnail(
+        asset=dict(manifest["thumbnail_asset"]),
+        kind=kind,
+        pack_id=str(manifest["pack_id"]),
+        output_path=thumbnail,
+        root=Path(__file__).resolve().parents[2],
+        max_file_size_bytes=int(config["video"]["thumbnail"]["max_file_size_bytes"]),
+    )
 
 
 def assemble_asset_stage(*, config: dict[str, Any], stage_dir: Path) -> AssetRenderResult:
@@ -777,8 +796,11 @@ def assemble_asset_stage(*, config: dict[str, Any], stage_dir: Path) -> AssetRen
         raise RenderError(
             f"{asset_id} duration {actual:.1f}s is outside {minimum:.0f}-{maximum:.0f}s."
         )
-    thumbnail = output_dir / f"{pack_id}-{asset_id}-thumbnail.png"
-    shutil.copy2(scenes[0][0], thumbnail)
+    staged_thumbnail = stage_dir / "thumbnail.jpg"
+    if not staged_thumbnail.is_file():
+        raise RenderError(f"Missing staged thumbnail for {asset_id}.")
+    thumbnail = output_dir / f"{pack_id}-{asset_id}-thumbnail.jpg"
+    shutil.copy2(staged_thumbnail, thumbnail)
     preview = output_dir / f"{pack_id}-{asset_id}-preview.mp4"
     _make_preview(video, preview, seconds=int(config["approval"]["quick_preview_seconds"]))
     result = AssetRenderResult(

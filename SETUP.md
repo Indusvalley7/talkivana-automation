@@ -18,8 +18,8 @@ token is not required for this system.
 | --- | --- | --- |
 | `GEMINI_API_KEY` | Yes | Content generation and Standard German QA |
 | Google Desktop OAuth client JSON | Yes | Used once by the local setup helper to create the three YouTube secrets below |
-| `YOUTUBE_CLIENT_ID` | Yes | Private upload, scheduling, and analytics |
-| `YOUTUBE_CLIENT_SECRET` | Yes | Private upload, scheduling, and analytics |
+| `YOUTUBE_CLIENT_ID` | Yes | Private upload, thumbnails, scheduling, and analytics |
+| `YOUTUBE_CLIENT_SECRET` | Yes | Private upload, thumbnails, scheduling, and analytics |
 | `YOUTUBE_REFRESH_TOKEN` | Yes | Long-running YouTube authorization without daily sign-in |
 | German YouTube playlist ID | No | Routes uploads into the German playlist |
 | GitHub email notification setting | No | Sends approval and failure notices from GitHub |
@@ -27,6 +27,8 @@ token is not required for this system.
 Do not paste secret values into an Issue, commit, or chat. Enter them directly in GitHub Actions
 secrets, or use the local helper below. Chatterbox uses its public open-source model and the
 approved repository voice references, so it requires no Chatterbox or Hugging Face API key.
+Thumbnail creation also needs no new secret: the repository-owned thumbnail skill renders with
+Pillow, and the existing YouTube OAuth credentials apply the resulting JPEG.
 
 ## 2. Create the German playlist
 
@@ -173,6 +175,11 @@ lock is active or the playlist ID and secrets are absent.
 9. Approve the final videos.
 10. Confirm the two Shorts are scheduled one day before the linked long lessons.
 11. Confirm the Audience Timing Agent Issue exists.
+
+To apply the new design to videos uploaded before thumbnail automation was added, run
+**Actions → Talkivana — generate and apply thumbnails → Run workflow**. Leave the Issue field
+blank to update every uploaded Talkivana video, or enter one approval Issue number to limit the
+operation. This workflow changes thumbnails only and retains a seven-day audit artifact.
 
 Only after this sequence should the required repository variables be enabled. Content generation,
 analytics collection, tracker refresh, and rejected-preview deletion have separate switches so one

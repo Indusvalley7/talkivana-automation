@@ -35,6 +35,7 @@ from .renderer import (
     render_pack,
 )
 from .scheduling import build_timing_plan, next_publish_time
+from .thumbnails import DESIGN_VERSION, build_thumbnail_plan, render_youtube_thumbnail
 from .youtube import YouTubeUploader
 
 
@@ -271,7 +272,11 @@ def publish_production_previews(
         )
         if asset_id in results:
             raise PipelineError(f"Duplicate assembled artifact for {asset_id}.")
-        if not result.video_path.is_file() or not result.preview_path.is_file():
+        if (
+            not result.video_path.is_file()
+            or not result.preview_path.is_file()
+            or not result.thumbnail_path.is_file()
+        ):
             raise PipelineError(f"Assembled files are missing for {asset_id}.")
         results[asset_id] = (result, int(data.get("tts_request_count", 0)))
     expected_assets = set(descriptor["asset_ids"])
@@ -329,37 +334,61 @@ def publish_production_previews(
     youtube = config.raw["youtube"]
     asset_content = _assets_by_id(record)
     for asset_id in ("short-1", "short-2", "long-1", "long-2"):
-        if asset_id in existing_assets:
-            continue
         result = results[asset_id][0]
         content = asset_content[asset_id]
-        description = build_youtube_description(
-            kind=result.kind,
-            content=content,
-            config=config,
-            pack_id=record.pack_id,
-            asset_id=asset_id,
-        )
-        tags = list(dict.fromkeys([*content.get("tags", []), *youtube.get("tags", [])]))
-        uploaded = uploader.upload_private(
-            video_path=result.video_path,
-            title=str(content["title"]),
-            description=description,
-            tags=tags,
-            category_id=str(youtube["category_id"]),
-            default_language=str(youtube["default_language"]),
-            made_for_kids=bool(youtube["made_for_kids"]),
-            contains_synthetic_media=bool(youtube["contains_synthetic_media"]),
-        )
-        existing_assets[asset_id] = {
-            "asset_id": asset_id,
-            "kind": result.kind,
-            "title": result.title,
-            "video_id": uploaded.video_id,
-            "url": uploaded.url,
-            "duration_seconds": round(result.duration_seconds, 3),
-            "uploaded_at": datetime.now(timezone.utc).isoformat(),
-        }
+        if asset_id not in existing_assets:
+            description = build_youtube_description(
+                kind=result.kind,
+                content=content,
+                config=config,
+                pack_id=record.pack_id,
+                asset_id=asset_id,
+            )
+            tags = list(dict.fromkeys([*content.get("tags", []), *youtube.get("tags", [])]))
+            uploaded = uploader.upload_private(
+                video_path=result.video_path,
+                title=str(content["title"]),
+                description=description,
+                tags=tags,
+                category_id=str(youtube["category_id"]),
+                default_language=str(youtube["default_language"]),
+                made_for_kids=bool(youtube["made_for_kids"]),
+                contains_synthetic_media=bool(youtube["contains_synthetic_media"]),
+            )
+            existing_assets[asset_id] = {
+                "asset_id": asset_id,
+                "kind": result.kind,
+                "title": result.title,
+                "video_id": uploaded.video_id,
+                "url": uploaded.url,
+                "duration_seconds": round(result.duration_seconds, 3),
+                "uploaded_at": datetime.now(timezone.utc).isoformat(),
+                "thumbnail_status": "pending",
+            }
+            manifest = {
+                "pack_id": record.pack_id,
+                "assets": existing_assets,
+                "preview_workflow_run": os.environ.get("GITHUB_RUN_ID", ""),
+            }
+            latest = github.get_issue(issue_number)
+            github.update_issue(issue_number, body=write_upload_manifest(latest.body, manifest))
+
+        value = existing_assets[asset_id]
+        if value.get("thumbnail_design_version") != DESIGN_VERSION:
+            thumbnail_plan = build_thumbnail_plan(
+                asset=content,
+                kind=result.kind,
+                pack_id=record.pack_id,
+            )
+            uploader.set_thumbnail(
+                video_id=str(value["video_id"]),
+                thumbnail_path=result.thumbnail_path,
+            )
+            value["thumbnail_status"] = "applied"
+            value["thumbnail_design_version"] = DESIGN_VERSION
+            value["thumbnail_palette"] = thumbnail_plan.palette_name
+            value["thumbnail_headline"] = thumbnail_plan.headline
+            value["thumbnail_updated_at"] = datetime.now(timezone.utc).isoformat()
         manifest = {
             "pack_id": record.pack_id,
             "assets": existing_assets,
@@ -379,7 +408,8 @@ def publish_production_previews(
         "## Final-video approval required\n\n"
         "Watch every full private video while signed into the Talkivana channel account:\n\n"
         f"{links}\n\n"
-        f"Thirty-second convenience clips are attached to [{run_url}]({run_url}) for three days.\n\n"
+        f"Thirty-second convenience clips and generated thumbnails are attached to "
+        f"[{run_url}]({run_url}) for three days.\n\n"
         "Reply with `APPROVE VIDEO`, `RETRY VOICE: correction`, "
         "`RETRY VISUALS: correction`, `RETRY VIDEO: correction`, or `REJECT: reason`.\n\n"
         "Nothing is scheduled or public yet.",
@@ -644,36 +674,60 @@ def _produce_private_previews(
         youtube = config.raw["youtube"]
         asset_content = _assets_by_id(record)
         for result in rendered.assets:
-            if result.asset_id in existing_assets:
-                continue
             content = asset_content[result.asset_id]
-            description = build_youtube_description(
-                kind=result.kind,
-                content=content,
-                config=config,
-                pack_id=record.pack_id,
-                asset_id=result.asset_id,
-            )
-            tags = list(dict.fromkeys([*content.get("tags", []), *youtube.get("tags", [])]))
-            uploaded = uploader.upload_private(
-                video_path=result.video_path,
-                title=str(content["title"]),
-                description=description,
-                tags=tags,
-                category_id=str(youtube["category_id"]),
-                default_language=str(youtube["default_language"]),
-                made_for_kids=bool(youtube["made_for_kids"]),
-                contains_synthetic_media=bool(youtube["contains_synthetic_media"]),
-            )
-            existing_assets[result.asset_id] = {
-                "asset_id": result.asset_id,
-                "kind": result.kind,
-                "title": result.title,
-                "video_id": uploaded.video_id,
-                "url": uploaded.url,
-                "duration_seconds": round(result.duration_seconds, 3),
-                "uploaded_at": datetime.now(timezone.utc).isoformat(),
-            }
+            if result.asset_id not in existing_assets:
+                description = build_youtube_description(
+                    kind=result.kind,
+                    content=content,
+                    config=config,
+                    pack_id=record.pack_id,
+                    asset_id=result.asset_id,
+                )
+                tags = list(dict.fromkeys([*content.get("tags", []), *youtube.get("tags", [])]))
+                uploaded = uploader.upload_private(
+                    video_path=result.video_path,
+                    title=str(content["title"]),
+                    description=description,
+                    tags=tags,
+                    category_id=str(youtube["category_id"]),
+                    default_language=str(youtube["default_language"]),
+                    made_for_kids=bool(youtube["made_for_kids"]),
+                    contains_synthetic_media=bool(youtube["contains_synthetic_media"]),
+                )
+                existing_assets[result.asset_id] = {
+                    "asset_id": result.asset_id,
+                    "kind": result.kind,
+                    "title": result.title,
+                    "video_id": uploaded.video_id,
+                    "url": uploaded.url,
+                    "duration_seconds": round(result.duration_seconds, 3),
+                    "uploaded_at": datetime.now(timezone.utc).isoformat(),
+                    "thumbnail_status": "pending",
+                }
+                manifest = {
+                    "pack_id": record.pack_id,
+                    "assets": existing_assets,
+                    "preview_workflow_run": os.environ.get("GITHUB_RUN_ID", ""),
+                }
+                latest = github.get_issue(issue.number)
+                github.update_issue(issue.number, body=write_upload_manifest(latest.body, manifest))
+
+            value = existing_assets[result.asset_id]
+            if value.get("thumbnail_design_version") != DESIGN_VERSION:
+                thumbnail_plan = build_thumbnail_plan(
+                    asset=content,
+                    kind=result.kind,
+                    pack_id=record.pack_id,
+                )
+                uploader.set_thumbnail(
+                    video_id=str(value["video_id"]),
+                    thumbnail_path=result.thumbnail_path,
+                )
+                value["thumbnail_status"] = "applied"
+                value["thumbnail_design_version"] = DESIGN_VERSION
+                value["thumbnail_palette"] = thumbnail_plan.palette_name
+                value["thumbnail_headline"] = thumbnail_plan.headline
+                value["thumbnail_updated_at"] = datetime.now(timezone.utc).isoformat()
             manifest = {
                 "pack_id": record.pack_id,
                 "assets": existing_assets,
@@ -699,7 +753,8 @@ def _produce_private_previews(
             "## Final-video approval required\n\n"
             "Watch every full private video while signed into the Talkivana channel account:\n\n"
             f"{links}\n\n"
-            f"Thirty-second convenience clips are attached to [{run_url}]({run_url}) as a short-lived artifact.\n\n"
+            f"Thirty-second convenience clips and generated thumbnails are attached to "
+            f"[{run_url}]({run_url}) as a short-lived artifact.\n\n"
             "Reply with one command:\n\n"
             "- `APPROVE VIDEO`\n"
             "- `RETRY VOICE: optional correction`\n"
@@ -969,6 +1024,91 @@ def refresh_private_video_metadata(*, repository: str, issue_number: int) -> Non
         + "\n\nOnly the descriptions changed. All four videos remain private and unscheduled. "
         "Review the descriptions, then reply with `APPROVE VIDEO` when the complete pack is ready.",
     )
+
+
+def refresh_video_thumbnails(
+    *, repository: str, output_dir: Path, issue_number: int | None = None
+) -> dict[str, Any]:
+    """Render and apply content-specific thumbnails without changing video metadata or status."""
+    config = load_config(require_enabled=True)
+    github = GitHubClient(repository)
+    issues = (
+        [github.get_issue(issue_number)]
+        if issue_number is not None
+        else github.list_issues(state="all", labels=["talkivana"])
+    )
+    candidates: list[tuple[Issue, ContentPackRecord, dict[str, Any]]] = []
+    for issue in issues:
+        manifest = read_upload_manifest(issue.body)
+        if manifest.get("deleted_at") or not manifest.get("assets"):
+            continue
+        try:
+            record = parse_pack_record(issue.body)
+            _validate_record_again(record, config)
+        except Exception:
+            if issue_number is not None:
+                raise
+            continue
+        candidates.append((issue, record, manifest))
+    if not candidates:
+        scope = f"issue #{issue_number}" if issue_number is not None else "the repository"
+        raise PipelineError(f"No uploaded Talkivana videos were found in {scope}.")
+
+    uploader = YouTubeUploader()
+    maximum = int(config.raw["video"]["thumbnail"]["max_file_size_bytes"])
+    applied = 0
+    issue_numbers: list[int] = []
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for issue, record, manifest in candidates:
+        assets = dict(manifest.get("assets", {}))
+        content_by_id = _assets_by_id(record)
+        updated_lines: list[str] = []
+        for asset_id in ("short-1", "short-2", "long-1", "long-2"):
+            value = assets.get(asset_id)
+            content = content_by_id.get(asset_id)
+            if not isinstance(value, dict) or not content or not value.get("video_id"):
+                continue
+            kind = str(value.get("kind") or ("short" if asset_id.startswith("short") else "long"))
+            thumbnail_path = output_dir / f"issue-{issue.number}" / f"{record.pack_id}-{asset_id}-thumbnail.jpg"
+            plan = render_youtube_thumbnail(
+                asset=content,
+                kind=kind,
+                pack_id=record.pack_id,
+                output_path=thumbnail_path,
+                root=project_root(),
+                max_file_size_bytes=maximum,
+            )
+            uploader.set_thumbnail(
+                video_id=str(value["video_id"]),
+                thumbnail_path=thumbnail_path,
+            )
+            value["thumbnail_status"] = "applied"
+            value["thumbnail_design_version"] = DESIGN_VERSION
+            value["thumbnail_palette"] = plan.palette_name
+            value["thumbnail_headline"] = plan.headline
+            value["thumbnail_updated_at"] = datetime.now(timezone.utc).isoformat()
+            updated_lines.append(
+                f"- `{asset_id}` — **{plan.headline}** ({plan.palette_name}): {value.get('url', '')}"
+            )
+            applied += 1
+            # Persist after every successful API call so a later failure can be retried without
+            # losing the audit state for thumbnails that YouTube already accepted.
+            manifest["assets"] = assets
+            latest = github.get_issue(issue.number)
+            github.update_issue(issue.number, body=write_upload_manifest(latest.body, manifest))
+        if not updated_lines:
+            continue
+        github.comment(
+            issue.number,
+            "## Custom thumbnails applied\n\n"
+            + "\n".join(updated_lines)
+            + "\n\nOnly custom thumbnails changed. Titles, descriptions, visibility, publishing "
+              "times, playlists, and audience settings were left untouched.",
+        )
+        issue_numbers.append(issue.number)
+    if applied == 0:
+        raise PipelineError("No uploaded videos with usable content records were found.")
+    return {"applied": applied, "issues": issue_numbers, "design_version": DESIGN_VERSION}
 
 
 def _assets_by_id(record: ContentPackRecord) -> dict[str, dict[str, Any]]:

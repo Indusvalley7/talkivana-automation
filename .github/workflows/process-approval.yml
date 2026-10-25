@@ -191,7 +191,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: visuals-${{ matrix.asset }}
-          path: build/stage/${{ matrix.asset }}/slides
+          path: |
+            build/stage/${{ matrix.asset }}/slides
+            build/stage/${{ matrix.asset }}/thumbnail.jpg
           retention-days: 3
           if-no-files-found: error
           compression-level: 6
@@ -220,7 +222,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: visuals-${{ matrix.asset }}
-          path: build/stage/${{ matrix.asset }}/slides
+          path: build/stage/${{ matrix.asset }}
       - name: Install assembler
         run: |
           sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update -qq
@@ -235,7 +237,7 @@ jobs:
           name: assembled-${{ matrix.asset }}
           path: |
             build/stage/${{ matrix.asset }}/output/*.mp4
-            build/stage/${{ matrix.asset }}/output/*-thumbnail.png
+            build/stage/${{ matrix.asset }}/output/*-thumbnail.jpg
             build/stage/${{ matrix.asset }}/output/asset-result.json
           retention-days: 3
           if-no-files-found: error
@@ -279,7 +281,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: talkivana-full-controlled-sample-${{ github.event.issue.number }}
-          path: build/assembled/**/*.mp4
+          path: |
+            build/assembled/**/*.mp4
+            build/assembled/**/*-thumbnail.jpg
           if-no-files-found: error
           retention-days: 3
           compression-level: 0
@@ -287,7 +291,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: talkivana-30-second-previews-${{ github.event.issue.number }}
-          path: build/assembled/**/*-preview.mp4
+          path: |
+            build/assembled/**/*-preview.mp4
+            build/assembled/**/*-thumbnail.jpg
           if-no-files-found: error
           retention-days: 3
           compression-level: 6

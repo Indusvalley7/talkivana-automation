@@ -89,6 +89,15 @@
   "video": {
     "fps": 24,
     "max_practice_pause_seconds": 6,
+    "thumbnail": {
+      "design_version": "talkivana-thumbnail-v1",
+      "skill_file": "skills/youtube-thumbnail-design/SKILL.md",
+      "max_file_size_bytes": 2097152,
+      "long_width": 1280,
+      "long_height": 720,
+      "short_width": 1080,
+      "short_height": 1920
+    },
     "visual_style": {
       "status": "rotating Talkivana templates",
       "template_order": ["teal_tutor", "berry_classroom", "midnight_gold", "sunset_navy"],

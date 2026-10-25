@@ -137,6 +137,7 @@ class RendererTimelineTests(unittest.TestCase):
                 )
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(manifest["asset_id"], "short-1")
+            self.assertEqual(manifest["thumbnail_asset"]["title"], asset["title"])
             self.assertTrue(manifest["segments"])
             self.assertTrue(
                 all((stage_dir / item["audio_file"]).is_file() for item in manifest["segments"])

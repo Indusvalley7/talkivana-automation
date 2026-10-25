@@ -200,6 +200,37 @@ class YouTubeUploader:
         except Exception as exc:
             raise YouTubeError(f"Updating description for video {video_id} failed: {exc}") from exc
 
+    def set_thumbnail(self, *, video_id: str, thumbnail_path: Path) -> None:
+        """Upload only a video's custom thumbnail; no video metadata is changed."""
+        if not video_id:
+            raise YouTubeError("A YouTube video ID is required for thumbnail upload.")
+        if not thumbnail_path.is_file() or thumbnail_path.stat().st_size == 0:
+            raise YouTubeError(f"Thumbnail file is missing: {thumbnail_path}")
+        if thumbnail_path.stat().st_size > 2 * 1024 * 1024:
+            raise YouTubeError(f"Thumbnail exceeds Talkivana's 2 MB guard: {thumbnail_path}")
+        try:
+            from googleapiclient.http import MediaFileUpload
+        except ImportError as exc:
+            raise YouTubeError("google-api-python-client is not installed.") from exc
+        media = MediaFileUpload(
+            str(thumbnail_path),
+            mimetype="image/jpeg",
+            resumable=False,
+        )
+        retry = 0
+        while True:
+            try:
+                self.service.thumbnails().set(
+                    videoId=video_id,
+                    media_body=media,
+                ).execute()
+                return
+            except Exception as exc:
+                retry += 1
+                if retry > 4 or not _looks_retryable(exc):
+                    raise YouTubeError(f"Setting thumbnail for video {video_id} failed: {exc}") from exc
+                time.sleep(min(30, (2**retry) + random.random()))
+
     def publication_statuses(self, video_ids: list[str]) -> dict[str, dict[str, str]]:
         """Return owner-visible publication state, batching the API's 50-video limit."""
         clean_ids = list(dict.fromkeys(video_id for video_id in video_ids if video_id))

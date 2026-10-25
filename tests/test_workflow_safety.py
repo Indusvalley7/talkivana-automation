@@ -25,6 +25,16 @@ class WorkflowSafetyTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertEqual(text.count("fromJSON(needs.production_prepare.outputs.asset_matrix)"), 3)
         self.assertIn("talkivana-full-controlled-sample", text)
+        self.assertIn("*-thumbnail.jpg", text)
+
+    def test_thumbnail_backfill_is_manual_and_never_schedules_videos(self):
+        text = (
+            project_root() / ".github" / "workflows" / "refresh-thumbnails.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("workflow_dispatch", text)
+        self.assertIn("refresh-thumbnails", text)
+        self.assertNotIn("schedule:", text)
+        self.assertNotIn("production-publish", text)
 
 
 if __name__ == "__main__":

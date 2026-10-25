@@ -122,6 +122,24 @@ def _validate_shape(raw: dict[str, Any]) -> None:
         raise ConfigurationError("Shorts must use a vertical frame.")
     if int(raw["video"]["long"]["width"]) <= int(raw["video"]["long"]["height"]):
         raise ConfigurationError("Long videos must use a horizontal frame.")
+    thumbnail = raw["video"].get("thumbnail", {})
+    expected_thumbnail = {
+        "design_version": "talkivana-thumbnail-v1",
+        "skill_file": "skills/youtube-thumbnail-design/SKILL.md",
+        "long_width": 1280,
+        "long_height": 720,
+        "short_width": 1080,
+        "short_height": 1920,
+    }
+    for key, expected in expected_thumbnail.items():
+        if thumbnail.get(key) != expected:
+            raise ConfigurationError(f"video.thumbnail.{key} must remain {expected!r}.")
+    maximum_thumbnail_bytes = int(thumbnail.get("max_file_size_bytes", 0))
+    if not 100_000 <= maximum_thumbnail_bytes <= 2 * 1024 * 1024:
+        raise ConfigurationError("Thumbnail files must be capped between 100 KB and 2 MB.")
+    skill_path = project_root() / str(thumbnail["skill_file"])
+    if not skill_path.is_file():
+        raise ConfigurationError(f"Thumbnail design skill is missing: {skill_path}")
 
     pending = int(raw["system"].get("max_pending_packs", 0))
     if not 1 <= pending <= 14:

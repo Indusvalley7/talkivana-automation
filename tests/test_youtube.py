@@ -1,4 +1,7 @@
+import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 from language_video_automation.analytics import YouTubeAnalyticsClient
 from language_video_automation.youtube import YouTubeError, YouTubeUploader
@@ -101,6 +104,23 @@ class _StatusService:
         return self.resource
 
 
+class _ThumbnailResource:
+    def __init__(self):
+        self.call = None
+
+    def set(self, **kwargs):
+        self.call = kwargs
+        return _Request({"items": [{"default": {"url": "https://example.test/thumb.jpg"}}]})
+
+
+class _ThumbnailService:
+    def __init__(self):
+        self.resource = _ThumbnailResource()
+
+    def thumbnails(self):
+        return self.resource
+
+
 class YouTubeAccessTests(unittest.TestCase):
     def test_preflight_confirms_the_expected_channel_and_playlist(self):
         uploader = YouTubeUploader.__new__(YouTubeUploader)
@@ -144,6 +164,17 @@ class YouTubeAccessTests(unittest.TestCase):
         self.assertEqual(len(statuses), 51)
         self.assertEqual(len(uploader.service.resource.calls), 2)
         self.assertEqual(statuses["video-50"]["privacy_status"], "public")
+
+    def test_thumbnail_upload_targets_only_the_requested_video(self):
+        uploader = YouTubeUploader.__new__(YouTubeUploader)
+        uploader.service = _ThumbnailService()
+        with tempfile.TemporaryDirectory() as temporary:
+            thumbnail = Path(temporary) / "thumbnail.jpg"
+            thumbnail.write_bytes(b"jpeg-test")
+            with patch("googleapiclient.http.MediaFileUpload", return_value="media"):
+                uploader.set_thumbnail(video_id="video-1", thumbnail_path=thumbnail)
+        self.assertEqual(uploader.service.resource.call["videoId"], "video-1")
+        self.assertEqual(uploader.service.resource.call["media_body"], "media")
 
 
 if __name__ == "__main__":
