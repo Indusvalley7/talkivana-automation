@@ -51,7 +51,7 @@ class RendererTimelineTests(unittest.TestCase):
         asset = self.record.content["long_videos"][0]
         timeline = build_asset_timeline(self.record.content, asset, "long")
         tutor_segments = [segment for segment in timeline if "TUTOR" in segment.eyebrow]
-        self.assertGreaterEqual(len(tutor_segments), len(asset["dialogue"]) * 3)
+        self.assertGreaterEqual(len(tutor_segments), len(asset["dialogue"]) * 2)
         repeat_segments = [
             segment for segment in timeline
             if segment.display_mode == "lesson" and segment.cue_text == "REPEAT ALOUD"
@@ -104,7 +104,7 @@ class RendererTimelineTests(unittest.TestCase):
             and segment.english_text == first_turn["english"]
             and segment.german_text == first_turn["german"]
         ]
-        self.assertEqual(len(first_line), 6)
+        self.assertEqual(len(first_line), 5)
         self.assertTrue(all(segment.display_mode == "lesson" for segment in first_line))
         self.assertTrue(all(segment.english_text == asset["dialogue"][0]["english"] for segment in first_line))
         self.assertTrue(all(segment.german_text == asset["dialogue"][0]["german"] for segment in first_line))

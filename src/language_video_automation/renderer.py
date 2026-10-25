@@ -414,16 +414,11 @@ def _long_timeline(pack: dict[str, Any], asset: dict[str, Any]) -> list[Narratio
     ]
     total = len(asset["dialogue"])
     lead_ins = (
-        "Let's begin with the English meaning.",
-        "Nice start! Here is the next line in English.",
-        "Now let's add another useful sentence.",
-        "Good progress! Listen to the next English line.",
-        "Let's continue with the next part of the conversation.",
-    )
-    german_cues = (
-        "Now listen to the same idea in German.",
-        "Here is how that sounds in German.",
-        "Now hear the German sentence.",
+        "Let's hear the English meaning.",
+        "Nice! Here is the next English line.",
+        "Now another useful sentence.",
+        "Good! Listen to the next English line.",
+        "Let's continue.",
     )
     for index, turn in enumerate(asset["dialogue"], start=1):
         speaker = f"SPEAKER {turn['speaker']}"
@@ -461,18 +456,6 @@ def _long_timeline(pack: dict[str, Any], asset: dict[str, Any]) -> list[Narratio
                     **shared,
                 ),
                 NarrationSegment(
-                    eyebrow=f"LESSON {index} OF {total} • TUTOR",
-                    title=str(turn["german"]),
-                    body="Pronunciation guide shown on screen",
-                    transcript=german_cues[(index - 1) % len(german_cues)],
-                    spoken_language="English",
-                    pause_seconds=0.3,
-                    accent="accent",
-                    active_language="German",
-                    cue_text="PRONUNCIATION TIP",
-                    **shared,
-                ),
-                NarrationSegment(
                     eyebrow=f"LESSON {index} OF {total} • {speaker}",
                     title=str(turn["german"]),
                     body=f"Pronunciation: {turn['pronunciation']}",
@@ -488,7 +471,7 @@ def _long_timeline(pack: dict[str, Any], asset: dict[str, Any]) -> list[Narratio
                     eyebrow=f"LESSON {index} OF {total} • TUTOR",
                     title=str(turn["german"]),
                     body="Guided repetition",
-                    transcript="Excellent! Listen once more, then repeat the German aloud.",
+                    transcript="Great! Listen once more, then repeat aloud.",
                     spoken_language="English",
                     pause_seconds=0.3,
                     accent="secondary",
@@ -510,7 +493,7 @@ def _long_timeline(pack: dict[str, Any], asset: dict[str, Any]) -> list[Narratio
                 ),
             ]
         )
-        if index < total and index % 4 == 0:
+        if index < total and index % 6 == 0:
             segments.append(
                 NarrationSegment(
                     eyebrow=f"CHECKPOINT • {index} OF {total}",
