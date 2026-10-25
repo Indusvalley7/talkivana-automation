@@ -135,6 +135,10 @@ jobs:
           key: talkivana-chatterbox-v3-65b1843
       - name: Install FFmpeg
         run: |
+          if command -v ffmpeg >/dev/null 2>&1 && command -v ffprobe >/dev/null 2>&1; then
+            ffmpeg -version | head -n 1
+            exit 0
+          fi
           sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update -qq
           sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends ffmpeg
       - name: Install CPU-only speech runtime
@@ -225,8 +229,11 @@ jobs:
           path: build/stage/${{ matrix.asset }}
       - name: Install assembler
         run: |
-          sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update -qq
-          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends ffmpeg
+          if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1; then
+            sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update -qq
+            sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends ffmpeg
+          fi
+          ffmpeg -version | head -n 1
           python -m pip install --disable-pip-version-check -e .
       - name: Assemble, probe duration, and create review excerpt
         run: >-
