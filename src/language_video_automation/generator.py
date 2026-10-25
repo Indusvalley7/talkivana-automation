@@ -137,7 +137,7 @@ Pack:
         corrected, repair_problems = self._repair_validation_errors(
             corrected,
             playlist=playlist,
-            maximum_attempts=2,
+            maximum_attempts=3,
         )
         qa_problems.extend(repair_problems)
         corrected, audit_problems = self._audit_conversation_naturalness(
@@ -148,7 +148,7 @@ Pack:
         corrected, final_repair_problems = self._repair_validation_errors(
             corrected,
             playlist=playlist,
-            maximum_attempts=2,
+            maximum_attempts=3,
         )
         qa_problems.extend(final_repair_problems)
         return build_pack_record(
