@@ -47,6 +47,9 @@ scene. Rewrite the dialogue unless every requirement below passes:
   necessary follow-up or clarification, confirmation/resolution, and an appropriate closing.
 - Make every turn respond to or advance the immediately preceding turn. Never assemble unrelated
   textbook sentences merely because they use the vocabulary.
+- Make every utterance plausible for that speaker's role. A customer asks about or buys goods; a
+  seller answers, confirms, and completes payment. A passenger asks for travel information; station
+  staff provide it. Do not make a character state, ask, or command something merely to insert a word.
 - Preserve all facts across turns: names, items, quantities, time, place, and speaker intentions.
 - Do not introduce a question that is ignored, an answer without a question, unexplained topic
   changes, repeated greetings, or an ending before the practical goal is resolved.
@@ -60,6 +63,11 @@ scene. Rewrite the dialogue unless every requirement below passes:
 - Treat each vocabulary item's `german` value as the exact teachable surface form. It must appear
   as one contiguous phrase in the linked dialogue, including any article or inflection stored in
   that field. If this would sound unnatural, choose a different focus form before finalising.
+- Never turn an infinitive into an artificial noun phrase just to pass exact matching. For example,
+  a price question and a request to pay are separate natural intentions; use a line such as
+  `Ich möchte zahlen` rather than an invented construction such as `das Zahlen`.
+- Select focus vocabulary because it is central to the scenario. Each item should support a real
+  learner need in that scene, not force the scene to bend around a weakly related word.
 
 ## Standard German checks
 

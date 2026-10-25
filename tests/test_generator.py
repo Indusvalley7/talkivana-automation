@@ -72,7 +72,7 @@ class GeneratorTests(unittest.TestCase):
             "Standard German used in Germany; no dialects",
         )
         self.assertEqual(record.content["level"], "absolute beginner")
-        self.assertEqual(client.calls, 2)
+        self.assertEqual(client.calls, 3)
 
     def test_tutor_skill_profile_is_applied_to_generation_and_review(self):
         fixture = json.loads(
@@ -88,13 +88,15 @@ class GeneratorTests(unittest.TestCase):
             today=date(2026, 10, 25),
         )
 
-        self.assertEqual(len(client.prompts), 2)
-        for prompt in client.prompts:
+        self.assertEqual(len(client.prompts), 3)
+        for prompt in client.prompts[:2]:
             self.assertIn("Talkivana Language Learning Companion Profile", prompt)
             self.assertIn("complete opening-to-resolution arc", prompt)
             self.assertIn("Do not mix `du` and `Sie`", prompt)
         self.assertIn("spaced-repetition recycling", client.prompts[0])
         self.assertIn("read the German dialogue from first to last", client.prompts[1])
+        self.assertIn("final adversarial Talkivana conversation auditor", client.prompts[2])
+        self.assertIn("specific role would naturally say", client.prompts[2])
 
     def test_validation_failure_gets_one_bounded_tutor_repair(self):
         fixture = json.loads(
@@ -110,9 +112,10 @@ class GeneratorTests(unittest.TestCase):
             today=date(2026, 10, 25),
         )
 
-        self.assertEqual(client.calls, 3)
+        self.assertEqual(client.calls, 4)
         self.assertIn("does not use linked vocabulary term", client.prompts[2])
         self.assertIn("exact contiguous case-insensitive phrase", client.prompts[2])
+        self.assertIn("final adversarial Talkivana conversation auditor", client.prompts[3])
         self.assertTrue(
             any("Deterministic validation repair" in item for item in record.qa_problems)
         )

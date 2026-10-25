@@ -140,6 +140,17 @@ Pack:
             maximum_attempts=2,
         )
         qa_problems.extend(repair_problems)
+        corrected, audit_problems = self._audit_conversation_naturalness(
+            corrected,
+            playlist=playlist,
+        )
+        qa_problems.extend(audit_problems)
+        corrected, final_repair_problems = self._repair_validation_errors(
+            corrected,
+            playlist=playlist,
+            maximum_attempts=2,
+        )
+        qa_problems.extend(final_repair_problems)
         return build_pack_record(
             corrected,
             revision=revision,
@@ -208,6 +219,59 @@ Pack to repair:
             problems.extend(str(item) for item in repair.get("problems", []))
 
         raise AssertionError("Validation repair loop ended unexpectedly.")
+
+    def _audit_conversation_naturalness(
+        self,
+        pack: dict,
+        *,
+        playlist: Playlist,
+    ) -> tuple[dict, list[str]]:
+        """Run a separate adversarial audit for pragmatic, role-level naturalness."""
+        audit_prompt = f"""
+Act as the final adversarial Talkivana conversation auditor. An earlier editor already checked
+grammar, so assume it may still have missed artificial textbook dialogue or a phrase inserted only
+to satisfy vocabulary matching. Apply the Language Learning Companion Profile rigorously.
+
+For each long lesson:
+1. Identify the two roles and their single practical goal.
+2. Read only the German turns as one uninterrupted real-world scene.
+3. Check that each utterance is something that specific role would naturally say at that moment.
+4. Check that questions receive relevant answers, facts remain consistent, and the practical goal
+   is resolved before a natural closing.
+5. Reject word-for-word English structures, semantic nonsense, weakly related focus vocabulary,
+   and German manufactured solely to contain an exact term.
+
+Examples of defects that must be rewritten, not accepted:
+- `Was kostet das Zahlen?` is not a natural way to ask a purchase price or request payment. A
+  natural scene separates `Was kostet das?` from a line such as `Ich möchte zahlen.`
+- A passenger should ask for a departure time or platform; telling station staff to look at a clock
+  is not a plausible information request.
+- A seller naturally asks `Ist das alles?`, not a literal English-shaped construction when a more
+  idiomatic Standard German question is available.
+
+If a focus item causes artificial dialogue, replace it in the Short and focus_vocabulary with a
+more central A1 item, then use the replacement exact form naturally. Preserve exactly two Shorts,
+two long lessons, three linked vocabulary items per pair, and 12 alternating A/B turns beginning
+with A. Keep the approved asset IDs and metadata fields. Return the complete corrected pack and
+record every material correction in problems. Do not return the pack unchanged unless both German
+scenes pass every pragmatic test above.
+
+Guardrails:
+{self.guardrails}
+
+Pack to audit:
+{json.dumps(pack, ensure_ascii=False, indent=2)}
+""".strip()
+        audit = self.client.generate_json(
+            model=str(self.config.raw["models"]["text"]),
+            prompt=audit_prompt,
+            schema=QA_JSON_SCHEMA,
+        )
+        corrected = audit.get("corrected_pack")
+        if not isinstance(corrected, dict):
+            raise ValueError("Naturalness-audit response did not contain corrected_pack.")
+        self._apply_fixed_fields(corrected, playlist)
+        return corrected, [str(item) for item in audit.get("problems", [])]
 
     def _validate(self, pack: dict, playlist: Playlist) -> None:
         validate_content_pack(
