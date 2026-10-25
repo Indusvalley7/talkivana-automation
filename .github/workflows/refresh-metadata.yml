@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   metadata:
-    name: Apply approved long-video descriptions
+    name: Apply approved descriptions to all four videos
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

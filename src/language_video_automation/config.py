@@ -175,6 +175,18 @@ def _validate_shape(raw: dict[str, Any]) -> None:
         raise ConfigurationError("YouTube descriptions must not contain Markdown bold markers.")
     if len(long_description_template) > 4500:
         raise ConfigurationError("youtube.long_description_template is too long.")
+    short_description_template = str(raw["youtube"].get("short_description_template", ""))
+    if "{content_description}" not in short_description_template:
+        raise ConfigurationError(
+            "youtube.short_description_template must contain {content_description}."
+        )
+    forbidden_short_metadata = ("Pack ID", "Asset ID", "synthetic narration")
+    if any(value.lower() in short_description_template.lower() for value in forbidden_short_metadata):
+        raise ConfigurationError(
+            "youtube.short_description_template must not expose internal IDs or the old narration notice."
+        )
+    if len(short_description_template) > 1000:
+        raise ConfigurationError("youtube.short_description_template is too long.")
     try:
         ZoneInfo(str(raw["youtube"]["timezone"]))
     except ZoneInfoNotFoundError as exc:

@@ -96,7 +96,7 @@ def build_parser() -> argparse.ArgumentParser:
     timing.add_argument("--report", action="store_true", help="Post the weekly human-readable report")
 
     metadata = subparsers.add_parser(
-        "refresh-metadata", help="Apply approved descriptions to existing private long videos"
+        "refresh-metadata", help="Apply approved descriptions to all four existing private videos"
     )
     metadata.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
     metadata.add_argument("--issue", type=int, required=True)

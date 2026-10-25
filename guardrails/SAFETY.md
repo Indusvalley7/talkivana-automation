@@ -10,6 +10,6 @@
 - Reject hate, harassment, explicit sexuality, graphic violence, self-harm, wrongdoing,
   gambling, drugs, or unsafe challenges.
 - Never copy textbook passages, articles, television dialogue, lyrics, or other protected text.
-- Disclose automation and synthetic narration in the description.
+- Set YouTube's synthetic-media disclosure field on every upload. Do not place internal Pack IDs,
+  Asset IDs, or the old synthetic-narration notice in public Short descriptions.
 - When linguistic or safety validity is uncertain, fail closed and request a revision.
-

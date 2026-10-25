@@ -18,7 +18,7 @@
   "channel": {
     "name": "Talkivana",
     "tagline": "Real Conversations. Clear Language.",
-    "description_footer": "Talkivana — Real Conversations. Clear Language. This original educational lesson uses synthetic narration and was reviewed before publication.",
+    "description_footer": "Talkivana — Real Conversations.",
     "source_language": "English",
     "level": "absolute beginner",
     "audience": "general audience, family-safe, not specifically directed at children",
@@ -191,6 +191,7 @@
     "default_language": "en",
     "made_for_kids": false,
     "contains_synthetic_media": true,
+    "short_description_template": "{content_description}\n\nTalkivana — Real Conversations.\n\n#LearnGerman #GermanForBeginners #GermanVocabulary #Talkivana",
     "long_description_template": "Welcome to {brand_bold} — a friendly place to learn how people actually speak in everyday life.\n\nIn today’s beginner-friendly lesson, we’ll practise {lesson_topic_bold}. You’ll hear useful phrases, follow a natural conversation, and get time to listen and repeat at your own pace.\n\nDon’t worry about understanding everything immediately. Listen more than once, speak along with the video, and let your confidence grow one conversation at a time.\n\nIn this lesson, you’ll learn:\n• Useful phrases for {situation_bold}\n• Natural pronunciation and responses\n• Vocabulary you can use in real conversations\n• How to speak with greater confidence\n\nIf this lesson helped you, subscribe to {brand_bold} for more simple conversations for everyday, professional, and academic situations.\n\n💬 What situation would you like us to cover next? Share it in the comments.\n\n{tagline_bold}\n\n#LanguageLearning #BeginnerLanguageLessons #EverydayConversation #SpeakingPractice #Talkivana",
     "timezone": "Asia/Kolkata",
     "minimum_lead_hours": 18,

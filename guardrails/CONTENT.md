@@ -16,6 +16,9 @@
 - Use Standard German used in Germany. Do not use dialect spellings or regional dialect lessons.
 - Every long-video YouTube description uses the approved channel template. Only the lesson-topic
   and situation placeholders may change, and both are derived from the approved video heading.
+- Every Short description contains only its approved content summary, the sentence
+  `Talkivana — Real Conversations.`, and the configured language-learning hashtags. Never expose
+  a Pack ID, Asset ID, or synthetic-narration notice in a public Short description.
 - Never emit Markdown `**` markers into YouTube descriptions. The automated bold emphasis uses
   API-safe Unicode display characters only for the explicitly approved highlighted phrases.
 - Build progressive, original, practical situations for absolute beginners.

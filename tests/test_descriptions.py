@@ -22,17 +22,26 @@ class DescriptionTests(unittest.TestCase):
         self.assertTrue(description.endswith("#SpeakingPractice #Talkivana"))
         self.assertNotIn("Pack ID:", description)
 
-    def test_short_description_keeps_existing_format(self):
+    def test_short_description_uses_two_sentences_and_hashtags_without_internal_metadata(self):
         description = build_youtube_description(
             kind="short",
-            content={"title": "Words", "description": "Learn these words."},
+            content={
+                "title": "Direction Words",
+                "description": "Essential German vocabulary for asking for and understanding directions.",
+            },
             config=load_config(),
             pack_id="pack-1",
             asset_id="short-1",
         )
-        self.assertIn("Learn these words.", description)
-        self.assertIn("Pack ID: pack-1", description)
-        self.assertIn("Asset ID: short-1", description)
+        self.assertEqual(
+            description,
+            "Essential German vocabulary for asking for and understanding directions.\n\n"
+            "Talkivana — Real Conversations.\n\n"
+            "#LearnGerman #GermanForBeginners #GermanVocabulary #Talkivana",
+        )
+        self.assertNotIn("synthetic narration", description)
+        self.assertNotIn("Pack ID:", description)
+        self.assertNotIn("Asset ID:", description)
 
 
 if __name__ == "__main__":

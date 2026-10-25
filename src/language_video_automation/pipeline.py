@@ -953,10 +953,8 @@ def build_youtube_description(
             situation_bold=_visual_bold(topic),
             tagline_bold=_visual_bold("Talkivana — Real Conversations. Clear Language."),
         )
-    return (
-        f"{content['description']}\n\n{config.raw['channel']['description_footer']}\n"
-        f"Pack ID: {pack_id}\nAsset ID: {asset_id}"
-    )
+    template = str(config.raw["youtube"]["short_description_template"])
+    return template.format(content_description=str(content["description"]).strip())
 
 
 def _visual_bold(value: str) -> str:
@@ -976,7 +974,7 @@ def _visual_bold(value: str) -> str:
 
 
 def refresh_private_video_metadata(*, repository: str, issue_number: int) -> None:
-    """Refresh long-video descriptions without rendering, uploading, or scheduling videos."""
+    """Refresh all four descriptions without rendering, uploading, or scheduling videos."""
     config = load_config(require_enabled=True)
     github = GitHubClient(repository)
     issue = github.get_issue(issue_number)
@@ -995,10 +993,10 @@ def refresh_private_video_metadata(*, repository: str, issue_number: int) -> Non
     uploader = YouTubeUploader()
     updated_at = datetime.now(timezone.utc).isoformat()
     updated_lines: list[str] = []
-    for asset_id in ("long-1", "long-2"):
+    for asset_id in ("short-1", "short-2", "long-1", "long-2"):
         value = assets[asset_id]
         description = build_youtube_description(
-            kind="long",
+            kind="short" if asset_id.startswith("short-") else "long",
             content=content_by_id[asset_id],
             config=config,
             pack_id=record.pack_id,
@@ -1019,7 +1017,7 @@ def refresh_private_video_metadata(*, repository: str, issue_number: int) -> Non
     )
     github.comment(
         issue_number,
-        "## Long-video descriptions updated\n\n"
+        "## Video descriptions updated\n\n"
         + "\n".join(updated_lines)
         + "\n\nOnly the descriptions changed. All four videos remain private and unscheduled. "
         "Review the descriptions, then reply with `APPROVE VIDEO` when the complete pack is ready.",

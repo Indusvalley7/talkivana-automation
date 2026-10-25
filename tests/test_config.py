@@ -75,6 +75,17 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ConfigurationError):
             self.write(data)
 
+    def test_short_description_template_requires_content_and_hides_internal_metadata(self):
+        data = copy.deepcopy(self.base)
+        data["youtube"]["short_description_template"] = "Talkivana only."
+        with self.assertRaises(ConfigurationError):
+            self.write(data)
+
+        data = copy.deepcopy(self.base)
+        data["youtube"]["short_description_template"] += " Pack ID: internal"
+        with self.assertRaises(ConfigurationError):
+            self.write(data)
+
     def test_unknown_dry_run_asset_is_rejected(self):
         data = copy.deepcopy(self.base)
         data["system"]["dry_run_asset_id"] = "long-99"
