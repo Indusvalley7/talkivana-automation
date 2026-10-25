@@ -11,9 +11,11 @@ class _FakeGeminiClient:
     def __init__(self, pack):
         self.pack = pack
         self.calls = 0
+        self.prompts = []
 
-    def generate_json(self, **_kwargs):
+    def generate_json(self, **kwargs):
         self.calls += 1
+        self.prompts.append(kwargs["prompt"])
         if self.calls == 1:
             return copy.deepcopy(self.pack)
         return {
@@ -49,6 +51,28 @@ class GeneratorTests(unittest.TestCase):
         )
         self.assertEqual(record.content["level"], "absolute beginner")
         self.assertEqual(client.calls, 2)
+
+    def test_tutor_skill_profile_is_applied_to_generation_and_review(self):
+        fixture = json.loads(
+            (project_root() / "tests" / "fixtures" / "sample_pack.json").read_text(
+                encoding="utf-8"
+            )
+        )["content"]
+        config = load_config()
+        client = _FakeGeminiClient(fixture)
+        ContentPackGenerator(config, client).create(
+            playlist=config.active_playlists[0],
+            history=[],
+            today=date(2026, 10, 25),
+        )
+
+        self.assertEqual(len(client.prompts), 2)
+        for prompt in client.prompts:
+            self.assertIn("Talkivana Language Learning Companion Profile", prompt)
+            self.assertIn("complete opening-to-resolution arc", prompt)
+            self.assertIn("Do not mix `du` and `Sie`", prompt)
+        self.assertIn("spaced-repetition recycling", client.prompts[0])
+        self.assertIn("read the German dialogue from first to last", client.prompts[1])
 
 
 if __name__ == "__main__":

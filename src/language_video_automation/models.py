@@ -295,6 +295,14 @@ def validate_content_pack(
             corpus += " " + str(turn.get("german", "")).casefold()
         if len(set(speakers)) < 2:
             errors.append(f"long_videos[{index}] must use both speakers")
+        expected_speakers = [
+            "A" if turn_index % 2 == 0 else "B"
+            for turn_index in range(len(speakers))
+        ]
+        if speakers != expected_speakers:
+            errors.append(
+                f"long_videos[{index}] dialogue must start with A and alternate A/B exactly"
+            )
         for term in focus_terms:
             if term and term not in corpus:
                 errors.append(f"long_videos[{index}] does not use linked vocabulary term {term!r}")

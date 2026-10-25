@@ -37,7 +37,7 @@ class ContentPackGenerator:
         level = str(channel["level"])
         words = int(content["words_per_short"])
         turns = int(content["dialogue_turns_per_long"])
-        used = recent_vocabulary(history, playlist.target_language)
+        previously_taught = recent_vocabulary(history, playlist.target_language)
         ordinal = (today or date.today()).toordinal() * 2
         topics = [
             playlist.topics[(ordinal + offset + revision - 1) % len(playlist.topics)]
@@ -69,8 +69,18 @@ Non-negotiable configuration:
 - Each dialogue turn is spoken later as English once, German once, then German repeated once
 - After the teaching sequence, replay the complete coherent conversation in German only, once
 - Each conversation must progress naturally so the final German-only pass works as a single scene
+- Apply the Talkivana Language Learning Companion Profile in the repository guardrails to every
+  Short, long lesson, tutor-facing line, and conversation
+- Build each long conversation around stable speaker roles, one shared practical goal, and a
+  complete opening-to-resolution arc; every turn must answer or advance the turn before it
+- Use consistent register within each scene (never mix du and Sie), natural German chunks rather
+  than word-for-word translation, and CEFR A1 high-frequency language
+- Speaker A must start and the dialogue must alternate A/B exactly
 - Shorts contain vocabulary and English meaning only; long videos contain conversations/sentences
-- Recently used German terms to avoid: {json.dumps(used, ensure_ascii=False)}
+- Previously taught German terms available for spaced-repetition recycling:
+  {json.dumps(previously_taught, ensure_ascii=False)}
+- Do not reuse those terms as the three new Short focus items. Recycle one or two in each long
+  conversation only when they fit naturally and do not repeat an old scenario.
 {feedback}
 
 Make the two scenarios materially different. Use original examples and practical beginner situations.
@@ -87,11 +97,20 @@ Follow every repository guardrail below and return only the requested structured
         self._apply_fixed_fields(pack, playlist)
 
         qa_prompt = f"""
-Act as a strict Standard German bilingual editor and educational-quality reviewer.
+Act as a strict Standard German bilingual editor and an A1 tutor applying the Talkivana Language
+Learning Companion Profile from the guardrails below.
 Check every English/German meaning, simplified pronunciation, dialogue, cross-link, spelling,
 capitalisation, grammatical gender, verb form, register, originality, family safety, and absolute-
 beginner suitability. No dialects are allowed. The Shorts must be vocabulary-only; long videos
 must be conversations/sentences. Preserve exactly two of each asset and the configured counts.
+
+For each long video, ignore the English temporarily and read the German dialogue from first to last
+as a real scene. Correct it unless it has stable roles, consistent facts and register, adjacent turns
+that respond to one another, a practical goal, and a complete opening-to-resolution arc. Reject
+isolated textbook lines, unanswered questions, abrupt topic changes, forced vocabulary, and
+premature endings. Then verify that every English line exactly matches the corrected German.
+Confirm Speaker A starts and A/B alternate exactly. Prefer short, idiomatic, high-frequency A1
+chunks; simplify doubtful or advanced language. Record every material correction in problems.
 
 If any item is doubtful, replace it with simpler Standard German. Always return a complete
 corrected_pack. approved describes the corrected pack, not the original.

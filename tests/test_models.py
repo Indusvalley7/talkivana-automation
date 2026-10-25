@@ -68,6 +68,15 @@ class ModelTests(unittest.TestCase):
         with self.assertRaises(ContentValidationError):
             self.validate(content)
 
+    def test_long_lesson_must_start_with_a_and_alternate_speakers(self):
+        content = json.loads(json.dumps(self.record.content))
+        content["long_videos"][0]["dialogue"][0]["speaker"] = "B"
+        with self.assertRaisesRegex(
+            ContentValidationError,
+            "must start with A and alternate A/B exactly",
+        ):
+            self.validate(content)
+
     def test_issue_body_round_trip(self):
         restored = parse_pack_record(format_issue_body(self.record))
         self.assertEqual(restored.pack_id, self.record.pack_id)
