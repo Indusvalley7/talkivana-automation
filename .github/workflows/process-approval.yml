@@ -6,7 +6,7 @@ on:
 
 permissions:
   actions: write
-  contents: read
+  contents: write
   issues: write
 
 concurrency:
@@ -376,3 +376,10 @@ jobs:
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           GH_TOKEN: ${{ github.token }}
         run: python -m language_video_automation process-approval --event "$GITHUB_EVENT_PATH" --repo "$GITHUB_REPOSITORY"
+      - name: Refresh tracker and publishing-slot matrix after scheduling
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: python -m language_video_automation sync-tracker --repo "$GITHUB_REPOSITORY"

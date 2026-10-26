@@ -9,13 +9,37 @@ from language_video_automation.scheduling import (
     timing_stage,
 )
 from language_video_automation.config import load_config, project_root
+from language_video_automation.github_api import Issue, write_upload_manifest
 from language_video_automation.models import ContentPackRecord
-from language_video_automation.pipeline import _build_earliest_pack_schedule
+from language_video_automation.pipeline import (
+    _build_earliest_pack_schedule,
+    _reserved_slots_by_date,
+)
 
 
 class _NoScheduledPacks:
     def list_issues(self, **_kwargs):
         return []
+
+
+class _OneReservedSlot:
+    def list_issues(self, **_kwargs):
+        body = write_upload_manifest("", {
+            "assets": {
+                "short-1": {
+                    "scheduled_at": "2026-10-24T12:30:00+05:30",
+                    "slot_local": "12:30",
+                }
+            }
+        })
+        return [Issue(
+            number=99,
+            title="Scheduled pack",
+            body=body,
+            state="closed",
+            labels=("talkivana", "pack-scheduled"),
+            html_url="https://example.test/issues/99",
+        )]
 
 
 class SchedulingTests(unittest.TestCase):
@@ -122,6 +146,10 @@ class SchedulingTests(unittest.TestCase):
             publish_times["short-2"] - publish_times["short-1"],
             timedelta(minutes=30),
         )
+
+    def test_scheduler_checks_existing_schedule_before_assigning_a_slot(self):
+        reservations = _reserved_slots_by_date(_OneReservedSlot())
+        self.assertEqual(reservations[date(2026, 10, 24)], {"12:30"})
 
 
 if __name__ == "__main__":

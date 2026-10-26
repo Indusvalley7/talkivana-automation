@@ -2,7 +2,7 @@ name: Talkivana — sync video tracker
 
 on:
   schedule:
-    - cron: "41 3 * * *"
+    - cron: "17 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   tracker:
-    name: Rebuild approval, publishing, and analytics tracker
+    name: Rebuild trackers and publishing-slot matrix
     if: ${{ github.event_name == 'workflow_dispatch' || vars.TALKIVANA_TRACKER_AUTOMATION == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10

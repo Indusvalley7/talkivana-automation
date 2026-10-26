@@ -10,6 +10,7 @@ __pycache__/
 .cache/
 build/
 dist/
+outputs/
 *.mp4
 *.wav
 !voice_library/speaker-a-current-chatterbox.wav

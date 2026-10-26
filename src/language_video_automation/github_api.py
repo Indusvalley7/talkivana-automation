@@ -151,14 +151,21 @@ class GitHubClient:
 
     def upsert_file(self, *, path: str, text: str, message: str) -> bool:
         """Create or replace a UTF-8 repository file, avoiding no-op commits."""
+        return self.upsert_binary_file(
+            path=path,
+            content=text.encode("utf-8"),
+            message=message,
+        )
+
+    def upsert_binary_file(self, *, path: str, content: bytes, message: str) -> bool:
+        """Create or replace a repository file without corrupting binary content."""
         encoded_path = urllib.parse.quote(path, safe="/")
         current = self._request("GET", f"/contents/{encoded_path}", allow_404=True)
         payload: dict[str, Any] = {
             "message": message,
-            "content": base64.b64encode(text.encode("utf-8")).decode("ascii"),
+            "content": base64.b64encode(content).decode("ascii"),
         }
         if current is not None:
-            content = text.encode("utf-8")
             expected_sha = hashlib.sha1(
                 f"blob {len(content)}\0".encode("ascii") + content,
                 usedforsecurity=False,

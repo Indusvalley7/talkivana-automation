@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from .analytics import TIMING_ISSUE_TITLE, _read_timing_data
 from .config import load_config
 from .github_api import GitHubClient, Issue, parse_pack_record, read_upload_manifest
+from .schedule_workbook import build_schedule_workbook
 from .youtube import YouTubeUploader
 
 
@@ -133,10 +134,21 @@ def sync_video_tracker(*, repository: str) -> dict[str, Any]:
         text=markdown_text,
         message="Update Talkivana readable video tracker",
     )
+    schedule_workbook = build_schedule_workbook(
+        rows,
+        slots=list(config.raw["youtube"]["seed_publish_slots_local"]),
+        timezone_name=zone_name,
+    )
+    changed_schedule = github.upsert_binary_file(
+        path="tracker/publishing_schedule.xlsx",
+        content=schedule_workbook,
+        message="Update Talkivana publishing schedule matrix",
+    )
     return {
         "rows": len(rows),
         "csv_updated": changed_csv,
         "markdown_updated": changed_markdown,
+        "schedule_matrix_updated": changed_schedule,
     }
 
 

@@ -1,90 +1,120 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Talkivana Automation creates and manages beginner language-learning videos for the Talkivana YouTube channel.">
-  <title>Talkivana Automation</title>
-  <style>
-    :root {
-      color-scheme: dark;
-      --ink: #f8fafc;
-      --muted: #cbd5e1;
-      --panel: rgba(255, 255, 255, 0.08);
-      --teal: #2dd4bf;
-      --gold: #f6c85f;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 32px;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: var(--ink);
-      background:
-        radial-gradient(circle at 15% 20%, rgba(45, 212, 191, 0.22), transparent 30%),
-        radial-gradient(circle at 85% 75%, rgba(246, 200, 95, 0.18), transparent 28%),
-        linear-gradient(135deg, #071827, #0b3a42 58%, #11213a);
-    }
-    main {
-      width: min(760px, 100%);
-      padding: clamp(32px, 6vw, 64px);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 28px;
-      background: var(--panel);
-      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
-      backdrop-filter: blur(16px);
-    }
-    .eyebrow {
-      margin: 0 0 18px;
-      color: var(--gold);
-      font-size: 0.82rem;
-      font-weight: 800;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-    }
-    h1 {
-      margin: 0;
-      font-size: clamp(2.5rem, 8vw, 5.4rem);
-      line-height: 0.95;
-      letter-spacing: -0.05em;
-    }
-    p {
-      max-width: 60ch;
-      margin: 28px 0 0;
-      color: var(--muted);
-      font-size: clamp(1rem, 2.4vw, 1.2rem);
-      line-height: 1.7;
-    }
-    nav { margin-top: 34px; }
-    a {
-      display: inline-flex;
-      align-items: center;
-      min-height: 44px;
-      padding: 11px 18px;
-      border: 1px solid rgba(45, 212, 191, 0.55);
-      border-radius: 999px;
-      color: #d9fffa;
-      font-weight: 750;
-      text-decoration: none;
-    }
-    a:hover, a:focus-visible { background: rgba(45, 212, 191, 0.12); }
-  </style>
+  <meta name="description" content="The technical handbook and operating center for the Talkivana language-video automation.">
+  <meta name="theme-color" content="#071c1d">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Talkivana Automation · Field Guide">
+  <meta property="og:description" content="Architecture, workflows, guardrails, limits, and operator recipes for the Talkivana language-video automation.">
+  <meta property="og:url" content="https://indusvalley7.github.io/talkivana-automation/">
+  <meta property="og:image" content="https://indusvalley7.github.io/talkivana-automation/assets/og-field-guide.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>Talkivana Automation · Field Guide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/app.js" defer></script>
 </head>
-<body>
-  <main>
-    <p class="eyebrow">Talkivana</p>
-    <h1>Speak beyond borders.</h1>
-    <p>
-      Talkivana Automation is a private content-production tool used by the
-      Talkivana channel owner to create, schedule, publish, and review
-      beginner-friendly language-learning videos on YouTube.
-    </p>
-    <nav aria-label="Legal">
-      <a href="privacy.html">Privacy policy</a>
-    </nav>
-  </main>
+<body data-page="overview">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="site-shell">
+    <aside class="sidebar" aria-label="Documentation navigation"><div data-site-nav></div></aside>
+    <main id="main" class="main-canvas">
+      <header class="mobile-bar">
+        <a class="mini-brand" href="index.html"><span class="brand-mark">T</span> Talkivana</a>
+        <button class="icon-button" data-menu-toggle aria-label="Open navigation" aria-expanded="false">Menu</button>
+      </header>
+
+      <section class="hero hero-overview reveal">
+        <div class="hero-copy">
+          <p class="kicker"><span class="status-dot"></span> Automation field guide · v2</p>
+          <h1>The recipe book behind <em>four lessons a day.</em></h1>
+          <p class="lede">A living information center for how Talkivana plans, teaches, renders, reviews, publishes, and learns—without surrendering the final decision to automation.</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="architecture.html">Explore the system <span aria-hidden="true">→</span></a>
+            <button class="button button-quiet" data-command-open><kbd>⌘</kbd><kbd>K</kbd> Quick find</button>
+          </div>
+        </div>
+        <div class="hero-orbit" aria-label="System summary">
+          <div class="orbit-ring orbit-one"></div><div class="orbit-ring orbit-two"></div>
+          <div class="orbit-core"><strong>2 + 2</strong><span>daily assets</span></div>
+          <span class="orbit-chip chip-one">Plan</span><span class="orbit-chip chip-two">Teach</span>
+          <span class="orbit-chip chip-three">Render</span><span class="orbit-chip chip-four">Publish</span>
+        </div>
+      </section>
+
+      <section class="metric-ribbon reveal" aria-label="System guarantees">
+        <article><strong>2</strong><span>human approval gates</span></article>
+        <article><strong>4</strong><span>separate publish slots</span></article>
+        <article><strong>7</strong><span>maximum pending packs</span></article>
+        <article><strong>0</strong><span>unapproved public uploads</span></article>
+      </section>
+
+      <section class="section-block reveal" data-search-section>
+        <div class="section-heading">
+          <div><p class="eyebrow">The whole machine</p><h2>One loop, seven stations</h2></div>
+          <p>Every station leaves an observable record in GitHub, so a failure has a location, an owner, and a safe restart point.</p>
+        </div>
+        <div class="system-line" aria-label="Automation sequence">
+          <a class="system-node" href="content-studio.html"><span>01</span><strong>Content</strong><small>Gemini + tutor profile</small></a>
+          <a class="system-node" href="approvals.html"><span>02</span><strong>Gate one</strong><small>Content approval</small></a>
+          <a class="system-node" href="media-engine.html"><span>03</span><strong>Media</strong><small>Voice, visuals, assembly</small></a>
+          <a class="system-node" href="approvals.html"><span>04</span><strong>Gate two</strong><small>Exact-video approval</small></a>
+          <a class="system-node" href="workflows.html"><span>05</span><strong>Publish</strong><small>Private → scheduled</small></a>
+          <a class="system-node" href="operations.html"><span>06</span><strong>Observe</strong><small>24 h + 7 d analytics</small></a>
+          <a class="system-node" href="operations.html"><span>07</span><strong>Improve</strong><small>Timing experiment</small></a>
+        </div>
+      </section>
+
+      <section class="section-block reveal" data-search-section>
+        <div class="section-heading compact"><div><p class="eyebrow">Choose a chapter</p><h2>Open the right drawer</h2></div></div>
+        <div class="chapter-grid">
+          <a class="chapter-card tone-teal" href="architecture.html"><span class="chapter-number">01</span><span class="chapter-icon">⌘</span><h3>Architecture</h3><p>Components, data flow, trust boundaries, and source-of-truth files.</p><span class="card-link">See the blueprint →</span></a>
+          <a class="chapter-card tone-coral" href="workflows.html"><span class="chapter-number">02</span><span class="chapter-icon">↻</span><h3>Workflow atlas</h3><p>Every GitHub Action, its trigger, hand-off, artifact, and failure behavior.</p><span class="card-link">Trace a run →</span></a>
+          <a class="chapter-card tone-gold" href="content-studio.html"><span class="chapter-number">03</span><span class="chapter-icon">Aa</span><h3>Lesson studio</h3><p>The German teaching recipe, validation rules, and format contracts.</p><span class="card-link">Read the pedagogy →</span></a>
+          <a class="chapter-card tone-blue" href="media-engine.html"><span class="chapter-number">04</span><span class="chapter-icon">◉</span><h3>Media engine</h3><p>Chatterbox voices, timing, templates, thumbnails, and FFmpeg assembly.</p><span class="card-link">Inspect the pipeline →</span></a>
+          <a class="chapter-card tone-berry" href="approvals.html"><span class="chapter-number">05</span><span class="chapter-icon">✓</span><h3>Approval & publishing</h3><p>Owner commands, state transitions, scheduling, and catch-up policy.</p><span class="card-link">Operate the gates →</span></a>
+          <a class="chapter-card tone-slate" href="limits.html"><span class="chapter-number">06</span><span class="chapter-icon">∞</span><h3>Costs & limits</h3><p>What is free, what is quota-bound, and where throttles appear.</p><span class="card-link">Know the ceilings →</span></a>
+          <a class="chapter-card tone-moss" href="operations.html"><span class="chapter-number">07</span><span class="chapter-icon">+</span><h3>Operator recipes</h3><p>Setup, recovery, retries, emergency stops, retention, and tracking.</p><span class="card-link">Open the runbook →</span></a>
+        </div>
+      </section>
+
+      <section class="section-block two-column reveal" data-search-section>
+        <article class="feature-panel">
+          <p class="eyebrow">Control philosophy</p><h2>Automate the labour.<br>Keep the judgement.</h2>
+          <p>The system may draft, validate, synthesize, render, upload privately, and recommend a time. Only the repository owner can approve the content and the exact finished video.</p>
+          <div class="rule-stack">
+            <div><span>01</span><p><strong>Fail closed.</strong> Missing credentials, invalid German, broken audio, or incomplete uploads stop progress.</p></div>
+            <div><span>02</span><p><strong>Resume precisely.</strong> Manifests and issue labels preserve completed work and prevent duplicate uploads.</p></div>
+            <div><span>03</span><p><strong>Leave evidence.</strong> Issues, workflow logs, artifacts, and trackers explain what happened.</p></div>
+          </div>
+        </article>
+        <aside class="command-card">
+          <div class="terminal-top"><span></span><span></span><span></span><small>approval-console</small></div>
+          <div class="terminal-body">
+            <p class="comment"># First line controls the workflow</p>
+            <button class="copy-line" data-copy="APPROVE CONTENT"><code>APPROVE CONTENT</code><span>copy</span></button>
+            <button class="copy-line" data-copy="APPROVE VIDEO"><code>APPROVE VIDEO</code><span>copy</span></button>
+            <button class="copy-line" data-copy="RETRY VOICE: describe the correction"><code>RETRY VOICE: …</code><span>copy</span></button>
+            <button class="copy-line" data-copy="RETRY VISUALS: describe the correction"><code>RETRY VISUALS: …</code><span>copy</span></button>
+            <button class="copy-line" data-copy="REJECT: explain the reason"><code>REJECT: …</code><span>copy</span></button>
+            <p class="terminal-note">Owner-only · exact commands · case-insensitive</p>
+          </div>
+        </aside>
+      </section>
+
+      <footer data-site-footer></footer>
+    </main>
+  </div>
+  <div class="command-dialog" data-command-dialog hidden>
+    <div class="command-backdrop" data-command-close></div>
+    <div class="command-panel" role="dialog" aria-modal="true" aria-label="Quick navigation">
+      <div class="command-input-row"><span>⌕</span><input data-command-input type="search" placeholder="Find architecture, Chatterbox, retry…" autocomplete="off"><kbd>esc</kbd></div>
+      <div class="command-results" data-command-results></div>
+    </div>
+  </div>
 </body>
 </html>
