@@ -151,6 +151,9 @@ def _validate_shape(raw: dict[str, Any]) -> None:
         raise ConfigurationError("quick_preview_seconds must be between 1 and 60.")
     missed_delay = int(raw["approval"].get("missed_slot_publish_delay_minutes", 0))
     catch_up_gap = int(raw["approval"].get("catch_up_gap_minutes", 0))
+    rolling_buffer_days = int(raw["approval"].get("rolling_buffer_days", -1))
+    if not 0 <= rolling_buffer_days <= 7:
+        raise ConfigurationError("rolling_buffer_days must be between 0 and 7.")
     if not 1 <= missed_delay <= 15:
         raise ConfigurationError("missed_slot_publish_delay_minutes must be between 1 and 15.")
     if not 15 <= catch_up_gap <= 180:
@@ -166,6 +169,21 @@ def _validate_shape(raw: dict[str, Any]) -> None:
     minimum_gap = int(raw["youtube"].get("minimum_slot_gap_minutes", 0))
     if min(circular_gaps) < minimum_gap:
         raise ConfigurationError("Publishing slots are too close together.")
+    conveyor = {
+        str(asset): str(slot)
+        for asset, slot in raw["youtube"].get("stable_conveyor_assignments", {}).items()
+    }
+    expected_assets = {"short-1", "short-2", "long-1", "long-2"}
+    if set(conveyor) != expected_assets:
+        raise ConfigurationError(
+            "youtube.stable_conveyor_assignments must define all four Talkivana assets."
+        )
+    if len(set(conveyor.values())) != 4 or any(slot not in slots for slot in conveyor.values()):
+        raise ConfigurationError(
+            "Stable conveyor assignments must use each configured publishing slot exactly once."
+        )
+    if not isinstance(raw["timing_agent"].get("automatic_slot_reassignment"), bool):
+        raise ConfigurationError("timing_agent.automatic_slot_reassignment must be true or false.")
     long_description_template = str(raw["youtube"].get("long_description_template", ""))
     description_tokens = (
         "{brand_bold}",

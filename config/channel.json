@@ -13,7 +13,7 @@
     "approver_login": "Indusvalley7",
     "quick_preview_seconds": 30,
     "rejected_preview_retention_days": 14,
-    "rolling_buffer_days": 0,
+    "rolling_buffer_days": 1,
     "missed_slot_publish_delay_minutes": 5,
     "catch_up_gap_minutes": 30
   },
@@ -198,11 +198,18 @@
     "timezone": "Asia/Kolkata",
     "minimum_lead_hours": 18,
     "seed_publish_slots_local": ["07:30", "12:30", "18:00", "22:30"],
+    "stable_conveyor_assignments": {
+      "short-1": "07:30",
+      "long-1": "12:30",
+      "short-2": "18:00",
+      "long-2": "22:30"
+    },
     "minimum_slot_gap_minutes": 180,
     "tags": ["German for beginners", "learn German", "German conversation", "Talkivana"]
   },
   "timing_agent": {
     "enabled": true,
+    "automatic_slot_reassignment": false,
     "launch_date": "",
     "stage_1_days": 30,
     "stage_2_days": 30,

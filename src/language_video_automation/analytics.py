@@ -144,6 +144,8 @@ def run_timing_agent(*, repository: str, config: AppConfig, report: bool = False
         stage_2_exploration_ratio=float(timing["stage_2_exploration_ratio"]),
         stage_3_exploration_ratio=float(timing["stage_3_exploration_ratio"]),
         minimum_samples=int(timing["minimum_samples_per_format_slot"]),
+        stable_assignments=config.raw["youtube"]["stable_conveyor_assignments"],
+        automatic_reassignment=bool(timing["automatic_slot_reassignment"]),
     )
     data["current_plan"] = {
         "stage": plan.stage,
@@ -247,12 +249,12 @@ def _format_control_body(data: dict[str, Any]) -> str:
 This control page is updated automatically. The agent never publishes videos and cannot bypass
 either approval gate.
 
-**Current stage:** {plan.get('stage', 'waiting')}  
-**Experiment day:** {plan.get('day_number', 'waiting')}  
-**Exploration allocation:** {float(plan.get('exploration_ratio', 1)):.0%}  
+**Current stage:** {plan.get('stage', 'waiting')}<br>
+**Experiment day:** {plan.get('day_number', 'waiting')}<br>
+**Automatic exploration allocation:** {float(plan.get('exploration_ratio', 0)):.0%}<br>
 **Last collection:** {data.get('last_collected_at', 'No published data yet')}
 
-## Current four-slot assignment
+## Active four-slot conveyor
 
 {assignments}
 
@@ -264,11 +266,12 @@ either approval gate.
 
 ## Policy
 
-- Days 1–30: balanced experimentation.
-- Days 31–60: 70% promising slots and 30% controlled exploration.
-- Day 61 onward: 85% proven slots and 15% continued exploration.
+- Days 1–30: hold the approved conveyor stable and build an interpretable baseline.
+- Days 31–60: identify promising windows without automatically moving publications.
+- Day 61 onward: report evidence-backed recommendations for owner approval.
 - Shorts and long videos are scored independently.
 - An isolated viral or anomalous upload must not determine the schedule.
+- The timing agent cannot rearrange the approved conveyor automatically.
 
 {TIMING_DATA_START}
 {encoded}
@@ -285,6 +288,7 @@ def _format_weekly_report(data: dict[str, Any]) -> str:
         "## Weekly timing report\n\n"
         f"Stage {plan.get('stage', 'waiting')}, experiment day {plan.get('day_number', 'waiting')}. "
         f"{plan.get('explanation', 'Waiting for enough published data.')}\n\n"
-        f"Recommended assignment: {assignments or 'not enough data yet'}.\n\n"
-        "No publishing-time change bypasses content or final-video approval."
+        f"Active conveyor: {assignments or 'not enough data yet'}.\n\n"
+        "Analytics are observation-only. Any publishing-time change requires owner approval and "
+        "still cannot bypass content or final-video approval."
     )

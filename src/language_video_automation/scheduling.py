@@ -4,6 +4,7 @@ import hashlib
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from statistics import fmean
+from typing import Mapping
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
@@ -132,6 +133,8 @@ def build_timing_plan(
     stage_2_exploration_ratio: float = 0.30,
     stage_3_exploration_ratio: float = 0.15,
     minimum_samples: int = 4,
+    stable_assignments: Mapping[str, str] | None = None,
+    automatic_reassignment: bool = True,
 ) -> TimingPlan:
     if len(slots) != 4:
         raise ValueError("Exactly four separated daily slots are required.")
@@ -142,6 +145,22 @@ def build_timing_plan(
         stage_2_days=stage_2_days,
     )
     scores = score_slots(samples, slots=slots, minimum_samples=minimum_samples)
+    expected_assets = ("short-1", "long-1", "short-2", "long-2")
+    if not automatic_reassignment:
+        fixed = dict(stable_assignments or {})
+        if set(fixed) != set(expected_assets):
+            raise ValueError("Stable scheduling requires one assignment for every Talkivana asset.")
+        if len(set(fixed.values())) != 4 or any(slot not in slots for slot in fixed.values()):
+            raise ValueError("Stable scheduling must use every configured slot exactly once.")
+        assignments = tuple((asset_id, fixed[asset_id]) for asset_id in expected_assets)
+        return TimingPlan(
+            stage,
+            day_number,
+            0.0,
+            assignments,
+            scores,
+            "Stable conveyor: analytics are observation-only and slot changes require owner approval.",
+        )
     if stage == 1:
         exploration = 1.0
     elif stage == 2:

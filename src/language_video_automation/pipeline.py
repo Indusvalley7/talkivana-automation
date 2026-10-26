@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from .analytics import YouTubeAnalyticsClient, current_timing_assignments
+from .analytics import YouTubeAnalyticsClient
 from .approvals import ApprovalCommand, Decision, is_authorized, parse_approval_command
 from .config import AppConfig, ConfigurationError, load_config, project_root, validate_production_config
 from .gemini import GeminiClient
@@ -797,19 +797,20 @@ def _schedule_approved_pack(
         stage_2_exploration_ratio=float(timing["stage_2_exploration_ratio"]),
         stage_3_exploration_ratio=float(timing["stage_3_exploration_ratio"]),
         minimum_samples=int(timing["minimum_samples_per_format_slot"]),
+        stable_assignments=config.raw["youtube"]["stable_conveyor_assignments"],
+        automatic_reassignment=bool(timing["automatic_slot_reassignment"]),
     )
-    persisted = current_timing_assignments(github)
-    if persisted:
-        slot_by_asset, timing_explanation = persisted
-    else:
-        slot_by_asset = dict(plan.assignments)
-        timing_explanation = plan.explanation
+    # Scheduling reads the approved configuration directly. A stale timing-agent Issue can never
+    # move a future pack away from the stable conveyor.
+    slot_by_asset = dict(plan.assignments)
+    timing_explanation = plan.explanation
     short_date, long_date, actual_slots, publish_times, catch_up_assets = (
         _build_earliest_pack_schedule(
             github=github,
             config=config,
             record=record,
             slot_by_asset=slot_by_asset,
+            strict_slot_assignments=not bool(timing["automatic_slot_reassignment"]),
         )
     )
     uploader = YouTubeUploader()
@@ -1220,6 +1221,7 @@ def _build_earliest_pack_schedule(
     config: AppConfig,
     record: ContentPackRecord,
     slot_by_asset: dict[str, str],
+    strict_slot_assignments: bool = False,
     exclude_issue_number: int | None = None,
     now: datetime | None = None,
 ) -> tuple[date, date, dict[str, str], dict[str, datetime], set[str]]:
@@ -1267,6 +1269,9 @@ def _build_earliest_pack_schedule(
                 preferred = slot_by_asset[asset_id]
                 available = [slot for slot in seed_slots if slot not in occupied]
                 if not available:
+                    allocation_failed = True
+                    break
+                if strict_slot_assignments and preferred not in available:
                     allocation_failed = True
                     break
                 chosen = preferred if preferred in available else available[0]

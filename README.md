@@ -15,13 +15,15 @@ Production is disabled by default. No content is made public without both approv
 5. Four exact completed files and their content-specific custom thumbnails are uploaded privately to YouTube.
 6. The Issue contains the full private links; the Actions run contains 30-second clips.
 7. Only `APPROVE VIDEO` schedules the exact reviewed files.
-8. Shorts publish one day before their linked conversations.
-9. The timing agent collects equal-window performance samples and updates the four-slot plan.
+8. A one-day preparation buffer places Shorts before their linked conversations. Consecutive packs
+   overlap into the stable 07:30 / 12:30 / 18:00 / 22:30 IST conveyor.
+9. The timing agent collects equal-window performance samples but cannot rearrange the conveyor
+   without an owner-approved configuration change.
 
 If final approval arrives after a same-day slot, that asset uses a near-immediate catch-up release
 with a five-minute API safety buffer. Multiple missed assets remain at least 30 minutes apart.
 Catch-up uploads still appear in the tracker, but their exceptional times do not influence the
-normal four-slot timing experiment.
+stable four-slot timing baseline.
 
 ## Approval commands
 
@@ -57,6 +59,10 @@ new revision and updates the review sheet; visible Issue text is never silently 
 - Uploads remain private until final approval.
 - Seven unfinished daily packs across either approval gate are allowed; the eighth pauses generation.
 - Four daily publishing slots are distinct and separated by at least three hours.
+- Future packs use fixed roles: Short 1 at 07:30, long 1 at 12:30, Short 2 at 18:00, and long 2
+  at 22:30 IST. Existing YouTube schedules are never migrated automatically.
+- Daily generation continues at 06:47 IST and keeps a one-day publication buffer so review time
+  does not create an empty publishing day once the conveyor is filled.
 - Rejected private previews are deleted after 14 days.
 - Intermediate narration, scenes, and full MP4 transfers are deleted from Actions as soon as the
   run finishes; only 30-second convenience clips are retained for 3 days.

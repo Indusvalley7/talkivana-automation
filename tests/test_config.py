@@ -63,6 +63,17 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ConfigurationError):
             self.write(data)
 
+    def test_stable_conveyor_requires_all_four_unique_slots(self):
+        data = copy.deepcopy(self.base)
+        data["youtube"]["stable_conveyor_assignments"]["long-2"] = "18:00"
+        with self.assertRaises(ConfigurationError):
+            self.write(data)
+
+    def test_checked_in_config_uses_one_day_buffer_and_owner_locked_slots(self):
+        config = load_config()
+        self.assertEqual(config.raw["approval"]["rolling_buffer_days"], 1)
+        self.assertFalse(config.raw["timing_agent"]["automatic_slot_reassignment"])
+
     def test_long_description_template_requires_both_dynamic_fields(self):
         data = copy.deepcopy(self.base)
         data["youtube"]["long_description_template"] = "Only {lesson_topic_bold} is present."
