@@ -882,6 +882,47 @@ def _fit_duration(
     max_practice_pause: float,
 ) -> list[tuple[NarrationSegment, Path, float]]:
     total = sum(duration + segment.pause_seconds for segment, _, duration in resolved)
+    # Chatterbox can naturally vary by a few seconds even with deterministic input.
+    # When that puts a lesson just over its ceiling, remove only silent spacing after
+    # English tutor/transition beats. Never time-stretch speech or shorten the German
+    # listening and repetition pauses.
+    if total > maximum:
+        trim_needed = total - (maximum - 0.75)
+        pause_floors: dict[int, float] = {}
+        for index, (segment, _, _) in enumerate(resolved):
+            if segment.spoken_language.casefold() == "german":
+                continue
+            if "TUTOR" in segment.eyebrow:
+                pause_floors[index] = 0.10
+            elif segment.display_mode in {"intro", "conversation_intro"}:
+                pause_floors[index] = 0.35
+
+        remaining = trim_needed
+        while remaining > 0.01:
+            eligible = [
+                index
+                for index, floor in pause_floors.items()
+                if resolved[index][0].pause_seconds > floor + 0.01
+            ]
+            if not eligible:
+                break
+            share = remaining / len(eligible)
+            removed = 0.0
+            for index in eligible:
+                segment, path, duration = resolved[index]
+                floor = pause_floors[index]
+                decrease = min(share, segment.pause_seconds - floor)
+                resolved[index] = (
+                    replace(segment, pause_seconds=segment.pause_seconds - decrease),
+                    path,
+                    duration,
+                )
+                removed += decrease
+            if removed <= 0.01:
+                break
+            remaining -= removed
+            total -= removed
+
     # Fit the target length by giving the learner intentional response time.
     # Never append duplicate lesson material after the German-only conversation.
     if total < target:

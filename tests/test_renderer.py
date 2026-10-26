@@ -8,7 +8,9 @@ from unittest.mock import patch
 from language_video_automation.config import project_root
 from language_video_automation.models import ContentPackRecord
 from language_video_automation.renderer import (
+    NarrationSegment,
     TestToneSpeechProvider,
+    _fit_duration,
     build_asset_timeline,
     prepare_asset_voice_stage,
 )
@@ -142,6 +144,53 @@ class RendererTimelineTests(unittest.TestCase):
             self.assertTrue(
                 all((stage_dir / item["audio_file"]).is_file() for item in manifest["segments"])
             )
+
+    def test_overlength_fit_trims_only_english_tutor_spacing(self):
+        tutor = NarrationSegment(
+            eyebrow="LESSON 1 OF 1 • TUTOR",
+            title="Tutor",
+            body="Tutor guidance",
+            transcript="Listen carefully.",
+            spoken_language="English",
+            pause_seconds=4.0,
+            accent="primary",
+            display_mode="lesson",
+        )
+        german = NarrationSegment(
+            eyebrow="LESSON 1 OF 1 • REPEAT",
+            title="Guten Tag",
+            body="Repeat aloud",
+            transcript="Guten Tag",
+            spoken_language="German",
+            pause_seconds=4.0,
+            accent="secondary",
+            display_mode="lesson",
+        )
+        resolved = [
+            (tutor, Path("tutor.wav"), 160.0),
+            (german, Path("german.wav"), 165.0),
+        ]
+
+        fitted = _fit_duration(
+            resolved,
+            asset={"asset_id": "long-1"},
+            kind="long",
+            speech=TestToneSpeechProvider(),
+            audio_dir=Path("audio"),
+            cache={},
+            minimum=270.0,
+            target=300.0,
+            maximum=330.0,
+            max_practice_pause=6.0,
+        )
+
+        self.assertAlmostEqual(sum(duration for _, _, duration in fitted), 325.0)
+        self.assertAlmostEqual(fitted[0][0].pause_seconds, 0.25)
+        self.assertEqual(fitted[1][0].pause_seconds, 4.0)
+        self.assertAlmostEqual(
+            sum(duration + segment.pause_seconds for segment, _, duration in fitted),
+            329.25,
+        )
 
 
 if __name__ == "__main__":
