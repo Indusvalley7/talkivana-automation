@@ -200,24 +200,62 @@ def _german_vocabulary_used(term: str, corpus: str) -> bool:
         content_words = term_words
 
     for word in content_words:
-        if word in corpus_words:
-            continue
-        if len(word) > 4 and word.endswith("en"):
-            stem = word[:-2]
-            conjugations = {
-                stem,
-                f"{stem}e",
-                f"{stem}st",
-                f"{stem}t",
-                f"{stem}en",
-                f"{stem}et",
-            }
-            if corpus_words.intersection(conjugations):
-                continue
-        if word.endswith("e") and f"{word}n" in corpus_words:
-            continue
-        return False
+        if not _german_word_family_used(word, corpus_words):
+            return False
     return bool(content_words)
+
+
+_SEPARABLE_PREFIXES = (
+    "ab", "an", "auf", "aus", "ein", "fest", "her", "hin", "los", "mit", "nach",
+    "statt", "teil", "vor", "weg", "weiter", "zu", "zurück", "zusammen",
+)
+
+
+def _umlaut_variant(value: str) -> str:
+    for source, target in (("a", "ä"), ("o", "ö"), ("u", "ü")):
+        if source in value:
+            return value.replace(source, target, 1)
+    return value
+
+
+def _german_word_family_used(word: str, corpus_words: set[str]) -> bool:
+    if word in corpus_words:
+        return True
+
+    # Adjectives appear with case/gender endings in natural sentences: frisch -> frische/frischen.
+    if len(word) >= 4 and corpus_words.intersection(
+        {f"{word}{ending}" for ending in ("e", "en", "er", "es", "em")}
+    ):
+        return True
+
+    if len(word) > 4 and word.endswith("en"):
+        stem = word[:-2]
+        stems = {stem, _umlaut_variant(stem)}
+        conjugations = {
+            form
+            for candidate in stems
+            for form in (
+                candidate,
+                f"{candidate}e",
+                f"{candidate}st",
+                f"{candidate}t",
+                f"{candidate}en",
+                f"{candidate}et",
+            )
+        }
+        if corpus_words.intersection(conjugations):
+            return True
+
+        # Separable verbs are written apart when conjugated: abfahren -> fährt ... ab.
+        for prefix in _SEPARABLE_PREFIXES:
+            base = word[len(prefix):]
+            if word.startswith(prefix) and len(base) > 3 and prefix in corpus_words:
+                if _german_word_family_used(base, corpus_words):
+                    return True
+
+    if word.endswith("e") and f"{word}n" in corpus_words:
+        return True
+    return False
 
 
 def validate_content_pack(

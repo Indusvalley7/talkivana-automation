@@ -5,6 +5,7 @@ from datetime import date
 
 from language_video_automation.config import load_config, project_root
 from language_video_automation.generator import ContentPackGenerator
+from language_video_automation.models import _german_vocabulary_used
 
 
 class _FakeGeminiClient:
@@ -48,6 +49,11 @@ class _RepairingGeminiClient(_FakeGeminiClient):
 
 
 class GeneratorTests(unittest.TestCase):
+    def test_natural_german_inflections_and_separable_verbs_count_as_linked_vocabulary(self):
+        self.assertTrue(_german_vocabulary_used("frisch", "Wir kaufen frische Brötchen."))
+        self.assertTrue(_german_vocabulary_used("abfahren", "Der Zug fährt um acht Uhr ab."))
+        self.assertFalse(_german_vocabulary_used("abfahren", "Der Zug kommt um acht Uhr an."))
+
     def test_configuration_owned_metadata_is_normalized_before_approval(self):
         fixture = json.loads(
             (project_root() / "tests" / "fixtures" / "sample_pack.json").read_text(

@@ -18,6 +18,11 @@ Production is disabled by default. No content is made public without both approv
 8. Shorts publish one day before their linked conversations.
 9. The timing agent collects equal-window performance samples and updates the four-slot plan.
 
+If final approval arrives after a same-day slot, that asset uses a near-immediate catch-up release
+with a five-minute API safety buffer. Multiple missed assets remain at least 30 minutes apart.
+Catch-up uploads still appear in the tracker, but their exceptional times do not influence the
+normal four-slot timing experiment.
+
 ## Approval commands
 
 ```text

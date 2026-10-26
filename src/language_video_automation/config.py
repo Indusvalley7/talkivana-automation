@@ -149,6 +149,12 @@ def _validate_shape(raw: dict[str, Any]) -> None:
         raise ConfigurationError("dry_run_asset_id must be empty or a known Talkivana asset ID.")
     if not 1 <= int(raw["approval"].get("quick_preview_seconds", 0)) <= 60:
         raise ConfigurationError("quick_preview_seconds must be between 1 and 60.")
+    missed_delay = int(raw["approval"].get("missed_slot_publish_delay_minutes", 0))
+    catch_up_gap = int(raw["approval"].get("catch_up_gap_minutes", 0))
+    if not 1 <= missed_delay <= 15:
+        raise ConfigurationError("missed_slot_publish_delay_minutes must be between 1 and 15.")
+    if not 15 <= catch_up_gap <= 180:
+        raise ConfigurationError("catch_up_gap_minutes must be between 15 and 180.")
 
     slots = [str(item) for item in raw["youtube"].get("seed_publish_slots_local", [])]
     if len(slots) != 4 or len(set(slots)) != 4:

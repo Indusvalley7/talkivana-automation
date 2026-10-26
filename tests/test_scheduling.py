@@ -1,6 +1,6 @@
 import json
 import unittest
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from language_video_automation.scheduling import (
     PerformanceSample,
@@ -65,34 +65,62 @@ class SchedulingTests(unittest.TestCase):
         short_score = next(item for item in plan.scores if item.format == "short" and item.slot_local == "07:30")
         self.assertEqual(short_score.confidence, "sufficient")
 
-    def test_earliest_pack_schedule_uses_next_safe_day_instead_of_seven_day_delay(self):
+    def test_missed_same_day_slot_uses_near_immediate_catch_up_instead_of_next_day(self):
         record = ContentPackRecord.from_dict(json.loads(
             (project_root() / "tests" / "fixtures" / "sample_pack.json").read_text(
                 encoding="utf-8"
             )
         ))
-        short_date, long_date, slots, publish_times = _build_earliest_pack_schedule(
+        short_date, long_date, slots, publish_times, catch_up_assets = (
+            _build_earliest_pack_schedule(
+                github=_NoScheduledPacks(),
+                config=load_config(),
+                record=record,
+                slot_by_asset={
+                    "short-1": "22:30",
+                    "short-2": "12:30",
+                    "long-1": "07:30",
+                    "long-2": "18:00",
+                },
+                now=datetime(2026, 10, 24, 11, 15, tzinfo=timezone.utc),
+            )
+        )
+        self.assertEqual(short_date, date(2026, 10, 24))
+        self.assertEqual(long_date, date(2026, 10, 25))
+        self.assertEqual(len(set(slots.values())), 4)
+        self.assertEqual(
+            publish_times["short-2"],
+            datetime(2026, 10, 24, 11, 20, tzinfo=timezone.utc),
+        )
+        self.assertEqual(slots["short-2"], "16:50")
+        self.assertEqual(catch_up_assets, {"short-2"})
+        self.assertEqual(
+            publish_times["long-1"],
+            datetime(2026, 10, 25, 2, 0, tzinfo=timezone.utc),
+        )
+
+    def test_multiple_missed_slots_are_not_released_together(self):
+        record = ContentPackRecord.from_dict(json.loads(
+            (project_root() / "tests" / "fixtures" / "sample_pack.json").read_text(
+                encoding="utf-8"
+            )
+        ))
+        _, _, _, publish_times, catch_up_assets = _build_earliest_pack_schedule(
             github=_NoScheduledPacks(),
             config=load_config(),
             record=record,
             slot_by_asset={
-                "short-1": "22:30",
+                "short-1": "07:30",
                 "short-2": "12:30",
-                "long-1": "07:30",
-                "long-2": "18:00",
+                "long-1": "18:00",
+                "long-2": "22:30",
             },
-            now=datetime(2026, 10, 24, 11, 15, tzinfo=timezone.utc),
+            now=datetime(2026, 10, 24, 12, 30, tzinfo=timezone.utc),
         )
-        self.assertEqual(short_date, date(2026, 10, 25))
-        self.assertEqual(long_date, date(2026, 10, 26))
-        self.assertEqual(len(set(slots.values())), 4)
+        self.assertEqual(catch_up_assets, {"short-1", "short-2"})
         self.assertEqual(
-            publish_times["short-2"],
-            datetime(2026, 10, 25, 7, 0, tzinfo=timezone.utc),
-        )
-        self.assertEqual(
-            publish_times["long-1"],
-            datetime(2026, 10, 26, 2, 0, tzinfo=timezone.utc),
+            publish_times["short-2"] - publish_times["short-1"],
+            timedelta(minutes=30),
         )
 
 

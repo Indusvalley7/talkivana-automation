@@ -92,6 +92,17 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaises(ConfigurationError):
             self.write(data)
 
+    def test_missed_slot_catch_up_policy_has_safe_bounds(self):
+        data = copy.deepcopy(self.base)
+        data["approval"]["missed_slot_publish_delay_minutes"] = 0
+        with self.assertRaises(ConfigurationError):
+            self.write(data)
+
+        data = copy.deepcopy(self.base)
+        data["approval"]["catch_up_gap_minutes"] = 5
+        with self.assertRaises(ConfigurationError):
+            self.write(data)
+
     def test_thumbnail_design_profile_and_dimensions_are_pinned(self):
         data = copy.deepcopy(self.base)
         data["video"]["thumbnail"]["long_width"] = 1000

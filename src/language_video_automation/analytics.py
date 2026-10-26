@@ -125,6 +125,7 @@ def run_timing_agent(*, repository: str, config: AppConfig, report: bool = False
                     "views": int(metrics.get("views", 0)),
                     "average_percentage_viewed": float(metrics.get("averageViewPercentage", 0)),
                     "subscribers_gained": int(metrics.get("subscribersGained", 0)),
+                    "anomalous": str(asset.get("schedule_mode", "")) == "catch-up",
                 }
                 samples_by_key[key] = sample
     data["samples"] = list(samples_by_key.values())
@@ -200,6 +201,7 @@ def _performance_samples(rows: list[dict[str, Any]]) -> list[PerformanceSample]:
                 views_7d=int(week["views"]),
                 average_percentage_viewed=float(week["average_percentage_viewed"]),
                 subscribers_gained=int(week["subscribers_gained"]),
+                anomalous=bool(base.get("anomalous", False)),
             )
         )
     return result

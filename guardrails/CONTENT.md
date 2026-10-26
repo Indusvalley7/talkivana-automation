@@ -5,7 +5,10 @@
   and simplified English pronunciation. No example sentences belong in a Short.
 - Every long video contains complete conversation lines and sentences, not a grammar lecture.
 - Each Short's vocabulary must appear verbatim in its linked conversation.
-- The Short is scheduled one day before the linked conversation.
+- The Short is normally scheduled one day before the linked conversation.
+- If final approval misses an intended same-day slot, use the earliest safe catch-up time instead
+  of rolling that asset to the same slot on the next day. Apply the configured API safety delay
+  and catch-up separation, and exclude that exceptional timing from slot-performance scoring.
 - Use English first, then Standard German, then repeat the same German naturally.
 - Keep English above German in the teaching view, with simplified pronunciation below German.
 - Never speak or spell out the simplified pronunciation guide. It is a visual aid only.

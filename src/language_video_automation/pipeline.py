@@ -34,7 +34,7 @@ from .renderer import (
     render_asset,
     render_pack,
 )
-from .scheduling import build_timing_plan, next_publish_time
+from .scheduling import build_timing_plan
 from .thumbnails import DESIGN_VERSION, build_thumbnail_plan, render_youtube_thumbnail
 from .youtube import YouTubeUploader
 
@@ -804,11 +804,13 @@ def _schedule_approved_pack(
     else:
         slot_by_asset = dict(plan.assignments)
         timing_explanation = plan.explanation
-    short_date, long_date, actual_slots, publish_times = _build_earliest_pack_schedule(
-        github=github,
-        config=config,
-        record=record,
-        slot_by_asset=slot_by_asset,
+    short_date, long_date, actual_slots, publish_times, catch_up_assets = (
+        _build_earliest_pack_schedule(
+            github=github,
+            config=config,
+            record=record,
+            slot_by_asset=slot_by_asset,
+        )
     )
     uploader = YouTubeUploader()
     youtube = config.raw["youtube"]
@@ -834,7 +836,12 @@ def _schedule_approved_pack(
         )
         value["scheduled_at"] = publish_at.isoformat()
         value["slot_local"] = actual_slots[asset_id]
-        scheduled_lines.append(f"- {asset_id}: `{publish_at.isoformat()}` — {value['url']}")
+        value["preferred_slot_local"] = slot_by_asset[asset_id]
+        value["schedule_mode"] = "catch-up" if asset_id in catch_up_assets else "planned"
+        catch_up_label = " (missed-slot catch-up)" if asset_id in catch_up_assets else ""
+        scheduled_lines.append(
+            f"- {asset_id}: `{publish_at.isoformat()}` — {value['url']}{catch_up_label}"
+        )
         latest = github.get_issue(issue.number)
         manifest["assets"] = assets
         github.update_issue(issue.number, body=write_upload_manifest(latest.body, manifest))
@@ -844,7 +851,8 @@ def _schedule_approved_pack(
         "## Approved and scheduled\n\n"
         + "\n".join(scheduled_lines)
         + f"\n\nTiming agent: {timing_explanation}\n"
-        "The linked vocabulary Shorts are scheduled one day before their conversation lessons.",
+        "The linked vocabulary Shorts are normally scheduled one day before their conversation "
+        "lessons; missed slots use the marked catch-up times.",
     )
 
 
@@ -889,18 +897,23 @@ def reschedule_pack_earliest(*, repository: str, issue_number: int) -> None:
     if set(assets) != expected:
         raise PipelineError("Rescheduling requires the complete four-video manifest.")
     slot_by_asset = {
-        asset_id: str(assets[asset_id].get("slot_local", ""))
+        asset_id: str(
+            assets[asset_id].get("preferred_slot_local")
+            or assets[asset_id].get("slot_local", "")
+        )
         for asset_id in expected
     }
     if any(not slot for slot in slot_by_asset.values()):
         raise PipelineError("Rescheduling requires the existing experimental slots.")
 
-    short_date, long_date, actual_slots, publish_times = _build_earliest_pack_schedule(
-        github=github,
-        config=config,
-        record=record,
-        slot_by_asset=slot_by_asset,
-        exclude_issue_number=issue_number,
+    short_date, long_date, actual_slots, publish_times, catch_up_assets = (
+        _build_earliest_pack_schedule(
+            github=github,
+            config=config,
+            record=record,
+            slot_by_asset=slot_by_asset,
+            exclude_issue_number=issue_number,
+        )
     )
     uploader = YouTubeUploader()
     youtube = config.raw["youtube"]
@@ -917,8 +930,11 @@ def reschedule_pack_earliest(*, repository: str, issue_number: int) -> None:
         )
         value["scheduled_at"] = publish_at.isoformat()
         value["slot_local"] = actual_slots[asset_id]
+        value["preferred_slot_local"] = slot_by_asset[asset_id]
+        value["schedule_mode"] = "catch-up" if asset_id in catch_up_assets else "planned"
         local_label = publish_at.astimezone(zone).strftime("%d %B %Y, %I:%M %p %Z")
-        lines.append(f"- {asset_id}: **{local_label}** — {value['url']}")
+        catch_up_label = " (missed-slot catch-up)" if asset_id in catch_up_assets else ""
+        lines.append(f"- {asset_id}: **{local_label}** — {value['url']}{catch_up_label}")
 
     manifest["assets"] = assets
     latest = github.get_issue(issue_number)
@@ -1163,6 +1179,41 @@ def _reserved_slots_by_date(
     return reservations
 
 
+def _reserved_publication_times(
+    github: GitHubClient,
+    *,
+    exclude_issue_number: int | None = None,
+) -> list[datetime]:
+    reserved: list[datetime] = []
+    for other in github.list_issues(state="closed", labels=["talkivana", "pack-scheduled"]):
+        if other.number == exclude_issue_number:
+            continue
+        for asset in read_upload_manifest(other.body).get("assets", {}).values():
+            scheduled = str(asset.get("scheduled_at", ""))
+            if scheduled:
+                reserved.append(
+                    datetime.fromisoformat(scheduled.replace("Z", "+00:00")).astimezone(
+                        timezone.utc
+                    )
+                )
+    return reserved
+
+
+def _next_separated_time(
+    candidate: datetime,
+    *,
+    occupied: list[datetime],
+    gap: timedelta,
+) -> datetime:
+    """Move a catch-up release only as far as needed to avoid crowding another upload."""
+    result = candidate
+    while True:
+        conflicts = [moment for moment in occupied if abs(result - moment) < gap]
+        if not conflicts:
+            return result
+        result = max(moment + gap for moment in conflicts)
+
+
 def _build_earliest_pack_schedule(
     *,
     github: GitHubClient,
@@ -1171,16 +1222,26 @@ def _build_earliest_pack_schedule(
     slot_by_asset: dict[str, str],
     exclude_issue_number: int | None = None,
     now: datetime | None = None,
-) -> tuple[date, date, dict[str, str], dict[str, datetime]]:
+) -> tuple[date, date, dict[str, str], dict[str, datetime], set[str]]:
     youtube = config.raw["youtube"]
     timezone_name = str(youtube["timezone"])
     zone = ZoneInfo(timezone_name)
-    minimum_lead_hours = int(youtube["minimum_lead_hours"])
     buffer_days = int(config.raw["approval"]["rolling_buffer_days"])
     lead_days = int(config.raw["content"]["vocabulary_lead_days"])
+    missed_delay = timedelta(
+        minutes=int(config.raw["approval"]["missed_slot_publish_delay_minutes"])
+    )
+    catch_up_gap = timedelta(minutes=int(config.raw["approval"]["catch_up_gap_minutes"]))
     seed_slots = list(youtube["seed_publish_slots_local"])
     scheduling_now = now or datetime.now(timezone.utc)
+    if scheduling_now.tzinfo is None:
+        scheduling_now = scheduling_now.replace(tzinfo=timezone.utc)
+    scheduling_now = scheduling_now.astimezone(timezone.utc)
     reservations = _reserved_slots_by_date(
+        github,
+        exclude_issue_number=exclude_issue_number,
+    )
+    reserved_times = _reserved_publication_times(
         github,
         exclude_issue_number=exclude_issue_number,
     )
@@ -1215,24 +1276,55 @@ def _build_earliest_pack_schedule(
                 break
 
         if not allocation_failed:
-            publish_times: dict[str, datetime] = {}
-            dates_match = True
+            intended_times: dict[str, datetime] = {}
             for asset_id in ("short-1", "short-2", "long-1", "long-2"):
                 target_date = short_date if asset_id.startswith("short") else long_date
-                publish_at = next_publish_time(
-                    timezone_name=timezone_name,
-                    local_time=actual_slots[asset_id],
-                    minimum_lead_hours=minimum_lead_hours,
-                    now=scheduling_now,
-                    not_before_date=target_date,
-                )
+                hour, minute = (int(value) for value in actual_slots[asset_id].split(":"))
+                intended_times[asset_id] = datetime(
+                    target_date.year,
+                    target_date.month,
+                    target_date.day,
+                    hour,
+                    minute,
+                    tzinfo=zone,
+                ).astimezone(timezone.utc)
+
+            publish_times: dict[str, datetime] = {}
+            catch_up_assets: set[str] = set()
+            occupied_times = list(reserved_times)
+            for asset_id in sorted(intended_times, key=intended_times.get):
+                intended = intended_times[asset_id]
+                if intended <= scheduling_now + missed_delay:
+                    publish_at = _next_separated_time(
+                        scheduling_now + missed_delay,
+                        occupied=occupied_times,
+                        gap=catch_up_gap,
+                    )
+                    catch_up_assets.add(asset_id)
+                else:
+                    publish_at = _next_separated_time(
+                        intended,
+                        occupied=occupied_times,
+                        gap=catch_up_gap,
+                    )
+                    if publish_at != intended:
+                        catch_up_assets.add(asset_id)
                 publish_times[asset_id] = publish_at
-                if publish_at.astimezone(zone).date() != target_date:
-                    dates_match = False
-            if dates_match:
-                if actual_slots["long-1"] == actual_slots["long-2"]:
-                    raise PipelineError("The two long videos must use different publishing times.")
-                return short_date, long_date, actual_slots, publish_times
+                occupied_times.append(publish_at)
+
+            if actual_slots["long-1"] == actual_slots["long-2"]:
+                raise PipelineError("The two long videos must use different publishing times.")
+            actual_publish_slots = {
+                asset_id: publish_at.astimezone(zone).strftime("%H:%M")
+                for asset_id, publish_at in publish_times.items()
+            }
+            return (
+                short_date,
+                long_date,
+                actual_publish_slots,
+                publish_times,
+                catch_up_assets,
+            )
 
         candidate = _next_available_short_date(
             github,
