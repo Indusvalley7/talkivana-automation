@@ -64,7 +64,7 @@ jobs:
   production_prepare:
     name: Production controller — authorize and freeze approved content
     needs: command_gate
-    if: ${{ needs.command_gate.outputs.authorized == 'true' && contains(fromJSON('["approve_content","retry_voice","retry_slides","retry_video"]'), needs.command_gate.outputs.decision) }}
+    if: ${{ needs.command_gate.outputs.authorized == 'true' && contains(fromJSON('["approve_content","retry_voice","retry_slides","retry_video","resume_video"]'), needs.command_gate.outputs.decision) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:

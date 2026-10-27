@@ -132,6 +132,7 @@ def prepare_production_event(*, event_path: Path, repository: str, output_path: 
         Decision.RETRY_VOICE,
         Decision.RETRY_SLIDES,
         Decision.RETRY_VIDEO,
+        Decision.RESUME_VIDEO,
     }
     if command.decision not in allowed:
         raise PipelineError(f"{command.decision.value} is not a production-render command.")
@@ -149,7 +150,12 @@ def prepare_production_event(*, event_path: Path, repository: str, output_path: 
         Decision.RETRY_SLIDES,
         Decision.RETRY_VIDEO,
     }
-    expected_label = "pack-awaiting-video" if replace_existing else "pack-awaiting-content"
+    resume_existing = command.decision is Decision.RESUME_VIDEO
+    expected_label = (
+        "pack-awaiting-video"
+        if replace_existing or resume_existing
+        else "pack-awaiting-content"
+    )
     if expected_label not in issue.labels:
         raise PipelineError(
             f"Issue #{issue.number} is not at the required {expected_label} approval gate."
@@ -169,9 +175,22 @@ def prepare_production_event(*, event_path: Path, repository: str, output_path: 
         raise PipelineError(f"Missing repository secrets: {', '.join(missing)}")
     record = parse_pack_record(issue.body)
     _validate_record_again(record, config)
-    asset_ids = _production_asset_ids(config)
+    if resume_existing:
+        asset_ids = _missing_production_asset_ids(read_upload_manifest(issue.body))
+        if not asset_ids:
+            raise PipelineError(
+                f"Issue #{issue.number} already has a complete four-video private manifest."
+            )
+    else:
+        asset_ids = _production_asset_ids(config)
     github.update_issue(issue.number, labels=["talkivana", "pack-producing"])
-    if replace_existing:
+    if resume_existing:
+        github.comment(
+            issue.number,
+            "Safe resume accepted. Existing private uploads will be preserved. "
+            f"Only the missing asset(s) will be rebuilt: {', '.join(asset_ids)}.",
+        )
+    elif replace_existing:
         github.comment(
             issue.number,
             f"{command.decision.value.replace('_', ' ').title()} accepted"
@@ -196,7 +215,8 @@ def prepare_production_event(*, event_path: Path, repository: str, output_path: 
         "repository": repository,
         "decision": command.decision.value,
         "replace_existing": replace_existing,
-        "dry_run": len(asset_ids) == 1,
+        "resume_existing": resume_existing,
+        "dry_run": len(asset_ids) == 1 and not resume_existing,
         "asset_ids": list(asset_ids),
         "record": record.as_dict(),
     }
@@ -334,6 +354,12 @@ def publish_production_previews(
     youtube = config.raw["youtube"]
     asset_content = _assets_by_id(record)
     for asset_id in ("short-1", "short-2", "long-1", "long-2"):
+        if asset_id not in results:
+            if asset_id in existing_assets:
+                continue
+            raise PipelineError(
+                f"No rendered or existing private asset is available for {asset_id}."
+            )
         result = results[asset_id][0]
         content = asset_content[asset_id]
         if asset_id not in existing_assets:
@@ -461,6 +487,18 @@ def _production_asset_ids(config: AppConfig) -> tuple[str, ...]:
     return ("short-1", "short-2", "long-1", "long-2")
 
 
+def _missing_production_asset_ids(manifest: dict[str, Any]) -> tuple[str, ...]:
+    assets = manifest.get("assets", {})
+    if not isinstance(assets, dict):
+        assets = {}
+    return tuple(
+        asset_id
+        for asset_id in ("short-1", "short-2", "long-1", "long-2")
+        if not isinstance(assets.get(asset_id), dict)
+        or not assets[asset_id].get("video_id")
+    )
+
+
 def _asset_with_kind(
     record: ContentPackRecord, asset_id: str
 ) -> tuple[str, dict[str, Any]]:
@@ -524,6 +562,12 @@ def _process_video_stage(
             + ". The complete pack will be rebuilt so voice, visuals, and timing remain synchronized.",
         )
         _produce_private_previews(github, config, issue, record, replace_existing=True)
+    elif command.decision is Decision.RESUME_VIDEO:
+        github.comment(
+            issue.number,
+            "Safe resume is handled by the staged production workflow. Existing private uploads "
+            "will remain untouched.",
+        )
     elif command.decision is Decision.REJECT:
         manifest = read_upload_manifest(issue.body)
         manifest["rejected_at"] = datetime.now(timezone.utc).isoformat()
@@ -1082,6 +1126,11 @@ def refresh_video_thumbnails(
             value = assets.get(asset_id)
             content = content_by_id.get(asset_id)
             if not isinstance(value, dict) or not content or not value.get("video_id"):
+                continue
+            if (
+                value.get("thumbnail_status") == "applied"
+                and value.get("thumbnail_design_version") == DESIGN_VERSION
+            ):
                 continue
             kind = str(value.get("kind") or ("short" if asset_id.startswith("short") else "long"))
             thumbnail_path = output_dir / f"issue-{issue.number}" / f"{record.pack_id}-{asset_id}-thumbnail.jpg"

@@ -35,6 +35,7 @@ APPROVE VIDEO
 RETRY VOICE: <correction>
 RETRY VISUALS: <correction>
 RETRY VIDEO: <correction>
+RESUME VIDEO: rebuild only missing private files
 REJECT: <reason>
 ```
 
@@ -67,6 +68,8 @@ new revision and updates the review sheet; visible Issue text is never silently 
 - Intermediate narration, scenes, and full MP4 transfers are deleted from Actions as soon as the
   run finishes; only 30-second convenience clips are retained for 3 days.
 - Every pack embeds a content hash, and every upload has an idempotent manifest.
+- `RESUME VIDEO` preserves completed private uploads and rebuilds only assets missing from a
+  failed handoff; it never deletes the successful files first.
 - Standard German is required and dialects are forbidden.
 - The general-audience channel is family-safe and is not marked made-for-kids.
 - Subtitles and closed captions are disabled.

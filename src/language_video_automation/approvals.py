@@ -11,6 +11,7 @@ class Decision(str, Enum):
     RETRY_VOICE = "retry_voice"
     RETRY_SLIDES = "retry_slides"
     RETRY_VIDEO = "retry_video"
+    RESUME_VIDEO = "resume_video"
     REJECT = "reject"
     IGNORE = "ignore"
 
@@ -28,6 +29,7 @@ _COMMANDS = {
     "RETRY VISUALS": Decision.RETRY_SLIDES,
     "RETRY SLIDES": Decision.RETRY_SLIDES,
     "RETRY VIDEO": Decision.RETRY_VIDEO,
+    "RESUME VIDEO": Decision.RESUME_VIDEO,
     "REJECT": Decision.REJECT,
 }
 
@@ -46,6 +48,7 @@ def parse_approval_command(body: str) -> ApprovalCommand:
         ("RETRY VISUALS:", Decision.RETRY_SLIDES),
         ("RETRY SLIDES:", Decision.RETRY_SLIDES),
         ("RETRY VIDEO:", Decision.RETRY_VIDEO),
+        ("RESUME VIDEO:", Decision.RESUME_VIDEO),
         ("REJECT:", Decision.REJECT),
     ):
         if upper.startswith(prefix):
@@ -58,6 +61,7 @@ def parse_approval_command(body: str) -> ApprovalCommand:
         ("RETRY VISUALS", Decision.RETRY_SLIDES),
         ("RETRY SLIDES", Decision.RETRY_SLIDES),
         ("RETRY VIDEO", Decision.RETRY_VIDEO),
+        ("RESUME VIDEO", Decision.RESUME_VIDEO),
         ("REJECT", Decision.REJECT),
     ):
         if upper == command and continuation:

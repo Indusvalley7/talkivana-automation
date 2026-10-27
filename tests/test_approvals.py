@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from language_video_automation.approvals import Decision, is_authorized, parse_approval_command
-from language_video_automation.pipeline import authorize_event
+from language_video_automation.pipeline import _missing_production_asset_ids, authorize_event
 
 
 class ApprovalTests(unittest.TestCase):
@@ -30,10 +30,23 @@ class ApprovalTests(unittest.TestCase):
         voice = parse_approval_command("RETRY VOICE\n- Speaker B sounds too flat")
         self.assertEqual(voice.decision, Decision.RETRY_VOICE)
         self.assertEqual(voice.reason, "- Speaker B sounds too flat")
+        resume = parse_approval_command("RESUME VIDEO: rebuild only missing private files")
+        self.assertEqual(resume.decision, Decision.RESUME_VIDEO)
+        self.assertEqual(resume.reason, "rebuild only missing private files")
 
     def test_casual_language_is_not_approval(self):
         for body in ("APPROVE", "looks good", "yes", "approved!", "👍", "> APPROVE VIDEO"):
             self.assertEqual(parse_approval_command(body).decision, Decision.IGNORE)
+
+    def test_safe_resume_selects_only_missing_private_assets(self):
+        manifest = {
+            "assets": {
+                "short-1": {"video_id": "short-one"},
+                "short-2": {"video_id": "short-two"},
+                "long-1": {"video_id": "long-one"},
+            }
+        }
+        self.assertEqual(_missing_production_asset_ids(manifest), ("long-2",))
 
     def test_only_configured_actor(self):
         self.assertTrue(is_authorized("Indusvalley7", "Indusvalley7", "Indusvalley7"))

@@ -26,6 +26,7 @@ class WorkflowSafetyTests(unittest.TestCase):
         self.assertEqual(text.count("fromJSON(needs.production_prepare.outputs.asset_matrix)"), 3)
         self.assertIn("talkivana-full-controlled-sample", text)
         self.assertIn("*-thumbnail.jpg", text)
+        self.assertIn('"resume_video"', text)
 
     def test_thumbnail_backfill_is_manual_and_never_schedules_videos(self):
         text = (
