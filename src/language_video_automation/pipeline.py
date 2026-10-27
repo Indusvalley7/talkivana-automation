@@ -354,14 +354,50 @@ def publish_production_previews(
     youtube = config.raw["youtube"]
     asset_content = _assets_by_id(record)
     for asset_id in ("short-1", "short-2", "long-1", "long-2"):
-        if asset_id not in results:
-            if asset_id in existing_assets:
-                continue
-            raise PipelineError(
-                f"No rendered or existing private asset is available for {asset_id}."
-            )
-        result = results[asset_id][0]
         content = asset_content[asset_id]
+        if asset_id not in results:
+            if asset_id not in existing_assets:
+                raise PipelineError(
+                    f"No rendered or existing private asset is available for {asset_id}."
+                )
+            value = existing_assets[asset_id]
+            if value.get("thumbnail_design_version") != DESIGN_VERSION:
+                thumbnail_path = (
+                    rendered_root
+                    / "recovery-thumbnails"
+                    / f"{record.pack_id}-{asset_id}-thumbnail.jpg"
+                )
+                thumbnail_plan = render_youtube_thumbnail(
+                    asset=content,
+                    kind=str(value.get("kind") or "long"),
+                    pack_id=record.pack_id,
+                    output_path=thumbnail_path,
+                    root=project_root(),
+                    max_file_size_bytes=int(
+                        config.raw["video"]["thumbnail"]["max_file_size_bytes"]
+                    ),
+                )
+                uploader.set_thumbnail(
+                    video_id=str(value["video_id"]),
+                    thumbnail_path=thumbnail_path,
+                )
+                value["thumbnail_status"] = "applied"
+                value["thumbnail_design_version"] = DESIGN_VERSION
+                value["thumbnail_palette"] = thumbnail_plan.palette_name
+                value["thumbnail_headline"] = thumbnail_plan.headline
+                value["thumbnail_updated_at"] = datetime.now(timezone.utc).isoformat()
+                manifest = {
+                    "pack_id": record.pack_id,
+                    "assets": existing_assets,
+                    "preview_workflow_run": os.environ.get("GITHUB_RUN_ID", ""),
+                }
+                latest = github.get_issue(issue_number)
+                github.update_issue(
+                    issue_number,
+                    body=write_upload_manifest(latest.body, manifest),
+                )
+            continue
+        result = results[asset_id][0]
         if asset_id not in existing_assets:
             description = build_youtube_description(
                 kind=result.kind,

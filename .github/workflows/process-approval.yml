@@ -308,7 +308,7 @@ jobs:
   production_failure:
     name: Failure controller — fail closed and identify the failed job
     needs: [command_gate, production_prepare, voice, visuals, assembly, private_upload]
-    if: ${{ always() && needs.command_gate.outputs.authorized == 'true' && contains(fromJSON('["approve_content","retry_voice","retry_slides","retry_video"]'), needs.command_gate.outputs.decision) && contains(needs.*.result, 'failure') }}
+    if: ${{ always() && needs.command_gate.outputs.authorized == 'true' && contains(fromJSON('["approve_content","retry_voice","retry_slides","retry_video","resume_video"]'), needs.command_gate.outputs.decision) && contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -331,7 +331,7 @@ jobs:
   artifact_cleanup:
     name: Cleanup controller — remove full intermediate artifacts
     needs: [command_gate, production_prepare, voice, visuals, assembly, private_upload, production_failure]
-    if: ${{ always() && needs.command_gate.outputs.authorized == 'true' && contains(fromJSON('["approve_content","retry_voice","retry_slides","retry_video"]'), needs.command_gate.outputs.decision) }}
+    if: ${{ always() && needs.command_gate.outputs.authorized == 'true' && contains(fromJSON('["approve_content","retry_voice","retry_slides","retry_video","resume_video"]'), needs.command_gate.outputs.decision) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
