@@ -94,7 +94,9 @@ def sync_video_tracker(*, repository: str) -> dict[str, Any]:
             metric = metrics.get(video_id, {})
             rows.append({
                 "s_no": str(len(rows) + 1),
-                "youtube_video_or_short_name": f"{label} {number}: {content['title']}",
+                "youtube_video_or_short_name": (
+                    f"{label} {number}: {asset.get('title') or content['title']}"
+                ),
                 "content_description": str(content["description"]),
                 "approved": approved,
                 "rejected": rejected,

@@ -36,6 +36,7 @@ from .renderer import (
 )
 from .scheduling import build_timing_plan
 from .thumbnails import DESIGN_VERSION, build_thumbnail_plan, render_youtube_thumbnail
+from .titles import find_title_collisions, validate_unique_titles
 from .youtube import YouTubeUploader
 
 
@@ -66,6 +67,7 @@ def create_daily_draft(*, repository: str, force: bool = False) -> Issue | None:
     github.ensure_labels()
     issues = github.list_issues(state="all", labels=["talkivana"])
     history = _history_from_issues(issues)
+    reserved_titles = _uploaded_titles_from_issues(issues)
     today = date.today()
     if not force and any(
         record.created_date == today.isoformat() and record.replacement_for is None
@@ -86,7 +88,13 @@ def create_daily_draft(*, repository: str, force: bool = False) -> Issue | None:
         print(f"Pending-pack guard reached ({len(pending)}/{maximum}); generation paused.")
         return None
     playlist = config.choose_playlist(today.toordinal())
-    record = _generate_record(config=config, playlist=playlist, history=history, today=today)
+    record = _generate_record(
+        config=config,
+        playlist=playlist,
+        history=history,
+        reserved_titles=reserved_titles,
+        today=today,
+    )
     issue = _create_pack_issue(github, config, record)
     print(f"Created content approval Issue #{issue.number}: {issue.html_url}")
     return issue
@@ -113,6 +121,14 @@ def process_approval_event(*, event_path: Path, repository: str) -> None:
     validate_production_config(config)
     record = parse_pack_record(issue.body)
     _validate_record_again(record, config)
+    if command.decision is Decision.APPROVE_CONTENT:
+        validate_unique_titles(
+            record.content,
+            reserved_titles=_uploaded_titles_from_issues(
+                github.list_issues(state="all", labels=["talkivana"]),
+                exclude_issue_number=issue.number,
+            ),
+        )
 
     if "pack-awaiting-content" in issue.labels:
         _process_content_stage(github, config, issue, record, command)
@@ -630,6 +646,7 @@ def _generate_record(
     revision: int = 1,
     replacement_for: int | None = None,
     revision_feedback: str = "",
+    reserved_titles: list[str] | tuple[str, ...] = (),
     today: date | None = None,
 ) -> ContentPackRecord:
     client = GeminiClient(max_requests=int(config.raw["system"]["max_generation_requests_per_run"]))
@@ -639,6 +656,7 @@ def _generate_record(
         revision=revision,
         replacement_for=replacement_for,
         revision_feedback=revision_feedback,
+        reserved_titles=reserved_titles,
         today=today,
     )
 
@@ -665,7 +683,8 @@ def _revise_content(
     github.update_issue(issue.number, labels=["talkivana", "pack-rejected"], state="closed")
     github.comment(issue.number, f"Revision requested: {reason}\n\nNothing was rendered or uploaded.")
     try:
-        history = _history_from_issues(github.list_issues(state="all", labels=["talkivana"]))
+        issues = github.list_issues(state="all", labels=["talkivana"])
+        history = _history_from_issues(issues)
         playlist = _playlist_for_record(config, record)
         replacement = _generate_record(
             config=config,
@@ -674,6 +693,10 @@ def _revise_content(
             revision=record.revision + 1,
             replacement_for=issue.number,
             revision_feedback=reason,
+            reserved_titles=_uploaded_titles_from_issues(
+                issues,
+                exclude_issue_number=issue.number,
+            ),
             today=date.fromisoformat(record.created_date),
         )
         new_issue = _create_pack_issue(github, config, replacement)
@@ -1436,6 +1459,86 @@ def _playlist_for_record(config: AppConfig, record: ContentPackRecord):
         )
     except StopIteration as exc:
         raise ConfigurationError(f"No enabled playlist matches {target!r}.") from exc
+
+
+def _uploaded_titles_from_issues(
+    issues: list[Issue],
+    *,
+    exclude_issue_number: int | None = None,
+) -> list[str]:
+    """Use upload manifests as the authoritative history visible to the audience."""
+    titles: list[str] = []
+    for issue in issues:
+        if issue.number == exclude_issue_number:
+            continue
+        manifest = read_upload_manifest(issue.body)
+        for asset in manifest.get("assets", {}).values():
+            title = str(asset.get("title", "")).strip()
+            if asset.get("video_id") and title:
+                titles.append(title)
+    return list(dict.fromkeys(titles))
+
+
+def reconcile_video_titles(*, repository: str) -> dict[str, Any]:
+    """Apply reviewed one-time title corrections to private scheduled uploads."""
+    config = load_config(require_enabled=True)
+    overrides = dict(config.raw["youtube"].get("title_overrides", {}))
+    if not overrides:
+        return {"updated": 0, "titles": []}
+
+    github = GitHubClient(repository)
+    issues = github.list_issues(state="all", labels=["talkivana"])
+    entries: dict[str, tuple[Issue, dict[str, Any], str, dict[str, Any]]] = {}
+    projected: list[str] = []
+    for issue in issues:
+        manifest = read_upload_manifest(issue.body)
+        pack_id = str(manifest.get("pack_id", ""))
+        for asset_id, asset in manifest.get("assets", {}).items():
+            if not asset.get("video_id"):
+                continue
+            key = f"{pack_id}/{asset_id}"
+            title = str(overrides.get(key, asset.get("title", ""))).strip()
+            projected.append(title)
+            entries[key] = (issue, manifest, str(asset_id), asset)
+
+    collisions = find_title_collisions(projected)
+    if collisions:
+        details = "; ".join(f"{left!r} / {right!r}" for left, right in collisions)
+        raise PipelineError(f"Configured title corrections still contain collisions: {details}")
+
+    target_video_ids = [
+        str(entries[key][3].get("video_id", ""))
+        for key in overrides
+        if key in entries
+    ]
+    uploader = YouTubeUploader()
+    statuses = uploader.publication_statuses(target_video_ids)
+    changed_by_issue: dict[int, tuple[Issue, dict[str, Any]]] = {}
+    updated: list[dict[str, str]] = []
+    for key, desired_title in overrides.items():
+        desired = str(desired_title).strip()
+        if key not in entries:
+            raise PipelineError(f"Configured title correction target does not exist: {key}")
+        issue, manifest, asset_id, asset = entries[key]
+        video_id = str(asset.get("video_id", ""))
+        if str(statuses.get(video_id, {}).get("privacy_status", "")) != "private":
+            raise PipelineError(
+                f"Refusing to rename {video_id}; title corrections are limited to private videos."
+            )
+        if str(asset.get("title", "")).strip() == desired:
+            continue
+        uploader.update_title(video_id=video_id, title=desired)
+        asset["title"] = desired
+        asset["title_override_applied_at"] = datetime.now(timezone.utc).isoformat()
+        changed_by_issue[issue.number] = (issue, manifest)
+        updated.append({"key": key, "video_id": video_id, "title": desired})
+
+    for issue_number, (issue, manifest) in changed_by_issue.items():
+        github.update_issue(
+            issue_number,
+            body=write_upload_manifest(issue.body, manifest),
+        )
+    return {"updated": len(updated), "titles": updated}
 
 
 def _history_from_issues(issues: list[Issue]) -> list[ContentPackRecord]:

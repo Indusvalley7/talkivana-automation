@@ -19,6 +19,7 @@ from .pipeline import (
     publish_production_previews,
     refresh_private_video_metadata,
     refresh_video_thumbnails,
+    reconcile_video_titles,
     report_production_failure,
     reschedule_pack_earliest,
     render_chatterbox_demo,
@@ -120,6 +121,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     tracker.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
 
+    titles = subparsers.add_parser(
+        "reconcile-titles",
+        help="Apply configured collision fixes to private scheduled YouTube titles",
+    )
+    titles.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
+
     preflight = subparsers.add_parser("preflight", help="Validate configuration and required tools")
     preflight.add_argument("--mode", choices=("local", "github"), default="local")
 
@@ -208,6 +215,10 @@ def main(argv: list[str] | None = None) -> None:
         elif args.command == "sync-tracker":
             _require_repo(args.repo)
             result = sync_video_tracker(repository=args.repo)
+            print(json.dumps(result, indent=2, sort_keys=True))
+        elif args.command == "reconcile-titles":
+            _require_repo(args.repo)
+            result = reconcile_video_titles(repository=args.repo)
             print(json.dumps(result, indent=2, sort_keys=True))
         elif args.command == "preflight":
             problems = run_preflight(mode=args.mode)

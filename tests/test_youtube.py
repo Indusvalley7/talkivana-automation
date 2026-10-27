@@ -157,6 +157,17 @@ class YouTubeAccessTests(unittest.TestCase):
         self.assertEqual(body["snippet"]["tags"], ["German", "Talkivana"])
         self.assertNotIn("status", body)
 
+    def test_title_update_preserves_description_and_other_snippet_metadata(self):
+        uploader = YouTubeUploader.__new__(YouTubeUploader)
+        uploader.service = _MetadataService()
+        uploader.update_title(video_id="video-1", title="A Distinct New Heading")
+        body = uploader.service.resource.update_call["body"]
+        self.assertEqual(body["id"], "video-1")
+        self.assertEqual(body["snippet"]["title"], "A Distinct New Heading")
+        self.assertEqual(body["snippet"]["description"], "Old description")
+        self.assertEqual(body["snippet"]["tags"], ["German", "Talkivana"])
+        self.assertNotIn("status", body)
+
     def test_publication_status_lookup_batches_more_than_fifty_videos(self):
         uploader = YouTubeUploader.__new__(YouTubeUploader)
         uploader.service = _StatusService()

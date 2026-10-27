@@ -211,6 +211,16 @@ def _validate_shape(raw: dict[str, Any]) -> None:
         )
     if len(short_description_template) > 1000:
         raise ConfigurationError("youtube.short_description_template is too long.")
+    title_overrides = raw["youtube"].get("title_overrides", {})
+    if not isinstance(title_overrides, dict):
+        raise ConfigurationError("youtube.title_overrides must be an object.")
+    for target, title in title_overrides.items():
+        if "/" not in str(target) or not str(title).strip():
+            raise ConfigurationError(
+                "Each youtube.title_overrides entry must use pack-id/asset-id and a title."
+            )
+        if len(str(title).strip()) > 100:
+            raise ConfigurationError("A YouTube title override exceeds 100 characters.")
     try:
         ZoneInfo(str(raw["youtube"]["timezone"]))
     except ZoneInfoNotFoundError as exc:

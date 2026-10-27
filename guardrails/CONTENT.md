@@ -1,5 +1,14 @@
 # Talkivana Content Rules
 
+## Audience-facing title uniqueness
+
+- Every Short and long-video heading must be materially distinct from every uploaded, scheduled,
+  or published Talkivana heading.
+- Singular/plural changes, punctuation changes, adding `German`, or swapping generic words such as
+  `vocabulary`, `lesson`, `Short`, and `video` do not create a new title.
+- A title collision must be repaired before rendering or upload. Never use a number suffix as the
+  only distinction.
+
 - Create exactly two vocabulary Shorts and two linked conversation lessons in every pack.
 - Every Short contains only Standard German words or verbs, their English meanings, part of speech,
   and simplified English pronunciation. No example sentences belong in a Short.

@@ -100,9 +100,26 @@ class GeneratorTests(unittest.TestCase):
             self.assertIn("complete opening-to-resolution arc", prompt)
             self.assertIn("Do not mix `du` and `Sie`", prompt)
         self.assertIn("spaced-repetition recycling", client.prompts[0])
+        self.assertIn("No heading may duplicate or closely", client.prompts[0])
         self.assertIn("read the German dialogue from first to last", client.prompts[1])
         self.assertIn("final adversarial Talkivana conversation auditor", client.prompts[2])
         self.assertIn("specific role would naturally say", client.prompts[2])
+
+    def test_existing_uploaded_titles_are_injected_into_generation(self):
+        fixture = json.loads(
+            (project_root() / "tests" / "fixtures" / "sample_pack.json").read_text(
+                encoding="utf-8"
+            )
+        )["content"]
+        config = load_config()
+        client = _FakeGeminiClient(fixture)
+        ContentPackGenerator(config, client).create(
+            playlist=config.active_playlists[0],
+            history=[],
+            reserved_titles=["Buying a Train Ticket at the Station"],
+            today=date(2026, 10, 25),
+        )
+        self.assertIn("Buying a Train Ticket at the Station", client.prompts[0])
 
     def test_validation_failure_gets_one_bounded_tutor_repair(self):
         fixture = json.loads(

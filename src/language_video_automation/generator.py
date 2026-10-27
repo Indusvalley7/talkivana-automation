@@ -14,6 +14,7 @@ from .models import (
     recent_vocabulary,
     validate_content_pack,
 )
+from .titles import validate_unique_titles
 
 
 class ContentPackGenerator:
@@ -30,6 +31,7 @@ class ContentPackGenerator:
         revision: int = 1,
         replacement_for: int | None = None,
         revision_feedback: str = "",
+        reserved_titles: list[str] | tuple[str, ...] = (),
         today: date | None = None,
     ) -> ContentPackRecord:
         channel = self.config.raw["channel"]
@@ -39,6 +41,7 @@ class ContentPackGenerator:
         words = int(content["words_per_short"])
         turns = int(content["dialogue_turns_per_long"])
         previously_taught = recent_vocabulary(history, playlist.target_language)
+        previous_headings = list(dict.fromkeys(str(title) for title in reserved_titles if title))
         ordinal = (today or date.today()).toordinal() * 2
         topics = [
             playlist.topics[(ordinal + offset + revision - 1) % len(playlist.topics)]
@@ -82,8 +85,13 @@ Non-negotiable configuration:
 - Shorts contain vocabulary and English meaning only; long videos contain conversations/sentences
 - Previously taught German terms available for spaced-repetition recycling:
   {json.dumps(previously_taught, ensure_ascii=False)}
+- Titles already used by uploaded, scheduled, or published Talkivana videos:
+  {json.dumps(previous_headings, ensure_ascii=False)}
 - Do not reuse those terms as the three new Short focus items. Recycle one or two in each long
   conversation only when they fit naturally and do not repeat an old scenario.
+- Give all four assets specific, audience-friendly headings. No heading may duplicate or closely
+  imitate a previous heading. Changing singular/plural, adding "German", or swapping generic
+  words such as "vocabulary", "lesson", or "video" does not make a title distinct.
 {feedback}
 
 Make the two scenarios materially different. Use original examples and practical beginner situations.
@@ -137,6 +145,7 @@ Pack:
         corrected, repair_problems = self._repair_validation_errors(
             corrected,
             playlist=playlist,
+            reserved_titles=previous_headings,
             maximum_attempts=3,
         )
         qa_problems.extend(repair_problems)
@@ -148,6 +157,7 @@ Pack:
         corrected, final_repair_problems = self._repair_validation_errors(
             corrected,
             playlist=playlist,
+            reserved_titles=previous_headings,
             maximum_attempts=3,
         )
         qa_problems.extend(final_repair_problems)
@@ -171,6 +181,7 @@ Pack:
         pack: dict,
         *,
         playlist: Playlist,
+        reserved_titles: list[str] | tuple[str, ...],
         maximum_attempts: int,
     ) -> tuple[dict, list[str]]:
         """Give the tutor reviewer a bounded chance to repair schema-level content defects."""
@@ -178,7 +189,7 @@ Pack:
         problems: list[str] = []
         for attempt in range(1, maximum_attempts + 1):
             try:
-                self._validate(corrected, playlist)
+                self._validate(corrected, playlist, reserved_titles=reserved_titles)
                 return corrected, problems
             except ContentValidationError as exc:
                 if attempt == maximum_attempts:
@@ -198,6 +209,8 @@ recognisable natural word-family form in its linked dialogue. Article/case chang
 and normal verb conjugation are valid; an unrelated word is not. If a selected item cannot occur
 naturally, change it in both the Short and focus_vocabulary and use the replacement in the scene.
 Speaker A starts and all 12 turns alternate A/B exactly.
+All four titles must also remain distinct from these existing audience-facing titles:
+{json.dumps(list(reserved_titles), ensure_ascii=False)}
 Record each material repair in problems. Do not merely explain the error.
 
 Guardrails:
@@ -274,7 +287,13 @@ Pack to audit:
         self._apply_fixed_fields(corrected, playlist)
         return corrected, [str(item) for item in audit.get("problems", [])]
 
-    def _validate(self, pack: dict, playlist: Playlist) -> None:
+    def _validate(
+        self,
+        pack: dict,
+        playlist: Playlist,
+        *,
+        reserved_titles: list[str] | tuple[str, ...] = (),
+    ) -> None:
         validate_content_pack(
             pack,
             source_language=str(self.config.raw["channel"]["source_language"]),
@@ -283,3 +302,4 @@ Pack to audit:
             words_per_short=int(self.config.raw["content"]["words_per_short"]),
             dialogue_turns_per_long=int(self.config.raw["content"]["dialogue_turns_per_long"]),
         )
+        validate_unique_titles(pack, reserved_titles=reserved_titles)

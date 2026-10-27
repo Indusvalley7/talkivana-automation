@@ -204,6 +204,11 @@
       "short-2": "18:00",
       "long-2": "22:30"
     },
+    "title_overrides": {
+      "2026-10-26-german-pack-r1-07a342f2c7/short-2": "Next Train and Station Words",
+      "2026-10-27-german-pack-r1-583f42bd67/short-1": "Street and Turn Words in German",
+      "2026-10-27-german-pack-r1-583f42bd67/long-1": "Excuse Me, Where Is the Train Station?"
+    },
     "minimum_slot_gap_minutes": 180,
     "tags": ["German for beginners", "learn German", "German conversation", "Talkivana"]
   },
