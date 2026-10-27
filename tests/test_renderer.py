@@ -11,6 +11,7 @@ from language_video_automation.renderer import (
     NarrationSegment,
     TestToneSpeechProvider,
     _fit_duration,
+    _select_visual_style,
     build_asset_timeline,
     prepare_asset_voice_stage,
 )
@@ -110,6 +111,41 @@ class RendererTimelineTests(unittest.TestCase):
         self.assertTrue(all(segment.display_mode == "lesson" for segment in first_line))
         self.assertTrue(all(segment.english_text == asset["dialogue"][0]["english"] for segment in first_line))
         self.assertTrue(all(segment.german_text == asset["dialogue"][0]["german"] for segment in first_line))
+
+    def test_visual_templates_rotate_by_daily_pack_and_remain_distinct(self):
+        config = json.loads(
+            (project_root() / "config" / "channel.json").read_text(encoding="utf-8")
+        )
+        style_config = config["video"]["visual_style"]
+        asset_ids = ("long-1", "long-2", "short-1", "short-2")
+        first_pack = {
+            asset_id: _select_visual_style(
+                style_config,
+                asset_id,
+                "2026-10-27-german-pack-r1-example",
+            )["template_name"]
+            for asset_id in asset_ids
+        }
+        next_pack = {
+            asset_id: _select_visual_style(
+                style_config,
+                asset_id,
+                "2026-10-28-german-pack-r1-example",
+            )["template_name"]
+            for asset_id in asset_ids
+        }
+
+        self.assertEqual(len(set(first_pack.values())), len(asset_ids))
+        self.assertNotEqual(first_pack["short-1"], next_pack["short-1"])
+        self.assertNotEqual(first_pack["short-2"], next_pack["short-2"])
+        self.assertEqual(
+            first_pack["short-1"],
+            _select_visual_style(
+                style_config,
+                "short-1",
+                "2026-10-27-german-pack-r1-example",
+            )["template_name"],
+        )
 
     def test_voice_job_writes_a_portable_stage_manifest(self):
         asset = self.record.content["shorts"][0]

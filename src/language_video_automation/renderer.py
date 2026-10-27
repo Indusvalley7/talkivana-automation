@@ -11,6 +11,7 @@ import tempfile
 import wave
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, replace
+from datetime import date
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -602,7 +603,11 @@ def render_asset(
             max_practice_pause=float(config["video"].get("max_practice_pause_seconds", 6.0)),
         )
     width, height = int(spec["width"]), int(spec["height"])
-    visual_style = _select_visual_style(config["video"].get("visual_style", {}), str(asset["asset_id"]))
+    visual_style = _select_visual_style(
+        config["video"].get("visual_style", {}),
+        str(asset["asset_id"]),
+        record.pack_id,
+    )
     scenes: list[tuple[Path, float]] = []
     with _workflow_group(f"Visual scene preparation — {asset['asset_id']}"):
         for index, (segment, _, audio_duration) in enumerate(resolved):
@@ -719,7 +724,11 @@ def prepare_asset_visual_stage(*, config: dict[str, Any], stage_dir: Path) -> No
     spec = config["video"][kind]
     width, height = int(spec["width"]), int(spec["height"])
     asset_id = str(manifest["asset_id"])
-    visual_style = _select_visual_style(config["video"].get("visual_style", {}), asset_id)
+    visual_style = _select_visual_style(
+        config["video"].get("visual_style", {}),
+        asset_id,
+        str(manifest["pack_id"]),
+    )
     slide_dir = stage_dir / "slides"
     slide_dir.mkdir(exist_ok=True)
     for index, (segment, _, _) in enumerate(resolved):
@@ -842,18 +851,39 @@ def _load_voice_stage(
     return manifest, resolved
 
 
-def _select_visual_style(style_config: dict[str, Any], asset_id: str) -> dict[str, str]:
+def _select_visual_style(
+    style_config: dict[str, Any],
+    asset_id: str,
+    pack_id: str = "",
+) -> dict[str, str]:
     templates = style_config.get("templates", {})
     order = style_config.get("template_order", [])
     if not isinstance(templates, dict) or not isinstance(order, list) or not order:
         return {str(key): str(value) for key, value in style_config.items()}
     asset_positions = {"long-1": 0, "long-2": 1, "short-1": 2, "short-2": 3}
-    position = asset_positions.get(asset_id, 0) % len(order)
+    position = (
+        _visual_style_pack_offset(pack_id, len(order))
+        + asset_positions.get(asset_id, 0)
+    ) % len(order)
     name = str(order[position])
     selected = templates.get(name, {})
     if not isinstance(selected, dict):
         raise RenderError(f"Unknown visual template: {name}")
     return {"template_name": name, **{str(key): str(value) for key, value in selected.items()}}
+
+
+def _visual_style_pack_offset(pack_id: str, template_count: int) -> int:
+    """Rotate palettes daily while keeping a retry of the same pack visually stable."""
+    if template_count <= 0 or not pack_id:
+        return 0
+    try:
+        pack_day = date.fromisoformat(pack_id[:10]).toordinal()
+        revision_part = pack_id.split("-pack-r", 1)[1].split("-", 1)[0]
+        revision = max(1, int(revision_part))
+        return (pack_day + revision - 1) % template_count
+    except (IndexError, TypeError, ValueError):
+        digest = hashlib.sha256(pack_id.encode("utf-8")).digest()
+        return int.from_bytes(digest[:4], "big") % template_count
 
 
 def _resolve_timeline(
