@@ -1,6 +1,6 @@
 # Talkivana video tracker
 
-This view is generated from approval Issues, YouTube status, and timing-agent data. Showing all 32 records. 
+This view is generated from approval Issues, YouTube status, and timing-agent data. Showing all 36 records. 
 The CSV file in this folder contains the complete analysis-ready history.
 
 | No. | Video / Short | Description | Approval | Reason | Publishing date | Published | YouTube |
@@ -28,7 +28,7 @@ The CSV file in this folder contains the complete analysis-ready history.
 | 21 | Short 1: German Public Transport Vocabulary | Essential German vocabulary for buying tickets and riding public transport. | Approved | Final videos approved; publication scheduled. | 2026-10-27T12:30+05:30 | Yes | [Open](https://youtu.be/jb2paJjXaHU) |
 | 22 | Short 2: German Direction Vocabulary | Essential German vocabulary for asking for and understanding directions. | Approved | Final videos approved; publication scheduled. | 2026-10-27T22:30+05:30 | Yes | [Open](https://youtu.be/kVJ0w5sbqHI) |
 | 23 | Video 1: Buying a Train Ticket at the Station | Learn how to buy a train ticket at the station in German with this step-by-step beginner dialogue. | Approved | Final videos approved; publication scheduled. | 2026-10-28T18:00+05:30 | No | [Open](https://youtu.be/5fpJqwTM6uo) |
-| 24 | Video 2: Asking for Directions in the City | Learn how to ask for and follow simple directions in German with this practical beginner dialogue. | Approved | Final videos approved; publication scheduled. | 2026-10-28T07:30+05:30 | No | [Open](https://youtu.be/ISvRHCvDcok) |
+| 24 | Video 2: Asking for Directions in the City | Learn how to ask for and follow simple directions in German with this practical beginner dialogue. | Approved | Final videos approved; publication scheduled. | 2026-10-28T07:30+05:30 | Yes | [Open](https://youtu.be/ISvRHCvDcok) |
 | 25 | Short 1: Grocery Shopping Vocabulary | Learn essential German words for buying fresh food at the grocery store. Talkivana — Real Conversations. #learn alemán #germanvocabulary #aprenderalemán | Approved | Final videos approved; publication scheduled. | 2026-10-30T07:30+05:30 | No | [Open](https://youtu.be/IW3BHoBPu94) |
 | 26 | Short 2: Next Train and Station Words | Master key German terms for navigating train stations and public transit. Talkivana — Real Conversations. #learn alemán #germanvocabulary #aprenderalemán | Approved | Final videos approved; publication scheduled. | 2026-10-30T18:00+05:30 | No | [Open](https://youtu.be/dFp52-2zJes) |
 | 27 | Video 1: Buying Fresh Fruit at the Grocery Store | In this complete absolute-beginner German lesson, practice shopping for groceries, asking for fresh fruit items, and paying at the counter. Talkivana — Real Conversations. #learn alemán #germanspeaking #aprenderalemán | Approved | Final videos approved; publication scheduled. | 2026-10-31T12:30+05:30 | No | [Open](https://youtu.be/W_D0x88nhHU) |
@@ -37,3 +37,7 @@ The CSV file in this folder contains the complete analysis-ready history.
 | 30 | Short 2: Daily Routine Vocabulary | Master helpful German words for talking about your morning and daily routine. Talkivana — Real Conversations. | Approved | Final videos approved; publication scheduled. | 2026-10-29T18:00+05:30 | No | [Open](https://youtu.be/LWmaR90nFqM) |
 | 31 | Video 1: Excuse Me, Where Is the Train Station? | Learn how to ask for directions in German with this natural A1 conversation. Talkivana — Real Conversations. | Approved | Final videos approved; publication scheduled. | 2026-10-30T12:30+05:30 | No | [Open](https://youtu.be/3ImUp3fishQ) |
 | 32 | Video 2: Starting the Morning Routine | Practice talking about your morning routine in German with this natural A1 dialogue. Talkivana — Real Conversations. | Approved | Final videos approved; publication scheduled. | 2026-10-30T22:30+05:30 | No | [Open](https://youtu.be/QymTIwUxCe4) |
+| 33 | Short 1: Office Desk Items and Actions in German | Learn essential workplace vocabulary for the office in German. Talkivana — Real Conversations. | Pending | Pending final video review. | — | No | [Open](https://youtu.be/2c2TgglM9co) |
+| 34 | Short 2: Classroom Materials and Study Tools in German | Master helpful school and study words in German. Talkivana — Real Conversations. | Pending | Pending final video review. | — | No | [Open](https://youtu.be/RqV2GlIYaxk) |
+| 35 | Video 1: Printing an Office Document with a Colleague | Learn how to print office documents with a colleague in German. Talkivana — Real Conversations. | Pending | Pending final video review. | — | No | [Open](https://youtu.be/g2BkbCMCW8I) |
+| 36 | Video 2: Asking a Study Question in the Classroom | Practice asking study questions and using a notebook in German. Talkivana — Real Conversations. | Pending | Pending final video review. | — | No | [Open](https://youtu.be/anNX_30y0P4) |
