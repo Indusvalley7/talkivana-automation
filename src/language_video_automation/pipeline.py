@@ -1540,12 +1540,12 @@ def reconcile_video_titles(*, repository: str) -> dict[str, Any]:
             raise PipelineError(f"Configured title correction target does not exist: {key}")
         issue, manifest, asset_id, asset = entries[key]
         video_id = str(asset.get("video_id", ""))
+        if str(asset.get("title", "")).strip() == desired:
+            continue
         if str(statuses.get(video_id, {}).get("privacy_status", "")) != "private":
             raise PipelineError(
                 f"Refusing to rename {video_id}; title corrections are limited to private videos."
             )
-        if str(asset.get("title", "")).strip() == desired:
-            continue
         uploader.update_title(video_id=video_id, title=desired)
         asset["title"] = desired
         asset["title_override_applied_at"] = datetime.now(timezone.utc).isoformat()
