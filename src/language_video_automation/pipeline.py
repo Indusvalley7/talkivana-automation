@@ -37,6 +37,7 @@ from .renderer import (
 from .scheduling import build_timing_plan
 from .thumbnails import DESIGN_VERSION, build_thumbnail_plan, render_youtube_thumbnail
 from .titles import find_title_collisions, validate_unique_titles
+from .topic_history import content_topic_entries, load_excel_video_history
 from .youtube import YouTubeUploader
 
 
@@ -68,6 +69,7 @@ def create_daily_draft(*, repository: str, force: bool = False) -> Issue | None:
     issues = github.list_issues(state="all", labels=["talkivana"])
     history = _history_from_issues(issues)
     reserved_titles = _uploaded_titles_from_issues(issues)
+    existing_topics = _existing_topic_history(history)
     today = date.today()
     if not force and any(
         record.created_date == today.isoformat() and record.replacement_for is None
@@ -93,6 +95,7 @@ def create_daily_draft(*, repository: str, force: bool = False) -> Issue | None:
         playlist=playlist,
         history=history,
         reserved_titles=reserved_titles,
+        existing_topics=existing_topics,
         today=today,
     )
     issue = _create_pack_issue(github, config, record)
@@ -647,6 +650,7 @@ def _generate_record(
     replacement_for: int | None = None,
     revision_feedback: str = "",
     reserved_titles: list[str] | tuple[str, ...] = (),
+    existing_topics: list[str] | tuple[str, ...] = (),
     today: date | None = None,
 ) -> ContentPackRecord:
     client = GeminiClient(max_requests=int(config.raw["system"]["max_generation_requests_per_run"]))
@@ -657,6 +661,7 @@ def _generate_record(
         replacement_for=replacement_for,
         revision_feedback=revision_feedback,
         reserved_titles=reserved_titles,
+        existing_topics=existing_topics,
         today=today,
     )
 
@@ -697,6 +702,7 @@ def _revise_content(
                 issues,
                 exclude_issue_number=issue.number,
             ),
+            existing_topics=_existing_topic_history(history),
             today=date.fromisoformat(record.created_date),
         )
         new_issue = _create_pack_issue(github, config, replacement)
@@ -1477,6 +1483,19 @@ def _uploaded_titles_from_issues(
             if asset.get("video_id") and title:
                 titles.append(title)
     return list(dict.fromkeys(titles))
+
+
+def _existing_topic_history(history: list[ContentPackRecord]) -> list[str]:
+    """Check the Excel registry every run, then supplement it with current Issue history."""
+    workbook_entries = load_excel_video_history(
+        project_root() / "tracker" / "publishing_schedule.xlsx"
+    )
+    issue_entries = [
+        entry
+        for record in history
+        for entry in content_topic_entries(record.content)
+    ]
+    return list(dict.fromkeys([*workbook_entries, *issue_entries]))
 
 
 def reconcile_video_titles(*, repository: str) -> dict[str, Any]:

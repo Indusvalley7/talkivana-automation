@@ -15,6 +15,7 @@ from .models import (
     validate_content_pack,
 )
 from .titles import validate_unique_titles
+from .topic_history import validate_unique_topics
 
 
 class ContentPackGenerator:
@@ -32,6 +33,7 @@ class ContentPackGenerator:
         replacement_for: int | None = None,
         revision_feedback: str = "",
         reserved_titles: list[str] | tuple[str, ...] = (),
+        existing_topics: list[str] | tuple[str, ...] = (),
         today: date | None = None,
     ) -> ContentPackRecord:
         channel = self.config.raw["channel"]
@@ -42,11 +44,7 @@ class ContentPackGenerator:
         turns = int(content["dialogue_turns_per_long"])
         previously_taught = recent_vocabulary(history, playlist.target_language)
         previous_headings = list(dict.fromkeys(str(title) for title in reserved_titles if title))
-        ordinal = (today or date.today()).toordinal() * 2
-        topics = [
-            playlist.topics[(ordinal + offset + revision - 1) % len(playlist.topics)]
-            for offset in range(2)
-        ]
+        tracked_topics = list(dict.fromkeys(str(topic) for topic in existing_topics if topic))
         feedback = (
             "\nThe owner requested this revision. Apply it exactly when it is safe and compatible "
             f"with the guardrails: {revision_feedback}"
@@ -67,7 +65,12 @@ Non-negotiable configuration:
 - Pair short-1 with long-1 and short-2 with long-2
 - Exactly {words} useful words or verbs in each Short
 - Exactly {turns} alternating A/B conversation turns in each long video
-- Topics, in pair order: {json.dumps(topics, ensure_ascii=False)}
+- Curriculum starting areas: {json.dumps(list(playlist.topics), ensure_ascii=False)}
+- Existing video and Short topics read from the checked-in Excel tracker:
+  {json.dumps(tracked_topics, ensure_ascii=False)}
+- Choose two new specific everyday situations that are materially different from every Excel
+  tracker entry. Do not make a cosmetic variation of an existing topic. If a curriculum starting
+  area is already represented, choose a different practical domain outside that starter list.
 - Pronunciation: simplified English spelling, never IPA
 - Every linked Short vocabulary item must reappear naturally in its long video's German dialogue.
   Natural article/case changes, noun plurals, and ordinary verb conjugation are allowed; never
@@ -146,6 +149,7 @@ Pack:
             corrected,
             playlist=playlist,
             reserved_titles=previous_headings,
+            existing_topics=tracked_topics,
             maximum_attempts=3,
         )
         qa_problems.extend(repair_problems)
@@ -158,6 +162,7 @@ Pack:
             corrected,
             playlist=playlist,
             reserved_titles=previous_headings,
+            existing_topics=tracked_topics,
             maximum_attempts=3,
         )
         qa_problems.extend(final_repair_problems)
@@ -182,6 +187,7 @@ Pack:
         *,
         playlist: Playlist,
         reserved_titles: list[str] | tuple[str, ...],
+        existing_topics: list[str] | tuple[str, ...],
         maximum_attempts: int,
     ) -> tuple[dict, list[str]]:
         """Give the tutor reviewer a bounded chance to repair schema-level content defects."""
@@ -189,7 +195,12 @@ Pack:
         problems: list[str] = []
         for attempt in range(1, maximum_attempts + 1):
             try:
-                self._validate(corrected, playlist, reserved_titles=reserved_titles)
+                self._validate(
+                    corrected,
+                    playlist,
+                    reserved_titles=reserved_titles,
+                    existing_topics=existing_topics,
+                )
                 return corrected, problems
             except ContentValidationError as exc:
                 if attempt == maximum_attempts:
@@ -211,6 +222,8 @@ naturally, change it in both the Short and focus_vocabulary and use the replacem
 Speaker A starts and all 12 turns alternate A/B exactly.
 All four titles must also remain distinct from these existing audience-facing titles:
 {json.dumps(list(reserved_titles), ensure_ascii=False)}
+Both lesson topics must remain materially different from these Excel tracker entries:
+{json.dumps(list(existing_topics), ensure_ascii=False)}
 Record each material repair in problems. Do not merely explain the error.
 
 Guardrails:
@@ -293,6 +306,7 @@ Pack to audit:
         playlist: Playlist,
         *,
         reserved_titles: list[str] | tuple[str, ...] = (),
+        existing_topics: list[str] | tuple[str, ...] = (),
     ) -> None:
         validate_content_pack(
             pack,
@@ -303,3 +317,4 @@ Pack to audit:
             dialogue_turns_per_long=int(self.config.raw["content"]["dialogue_turns_per_long"]),
         )
         validate_unique_titles(pack, reserved_titles=reserved_titles)
+        validate_unique_topics(pack, existing_topics=existing_topics)

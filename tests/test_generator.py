@@ -121,6 +121,23 @@ class GeneratorTests(unittest.TestCase):
         )
         self.assertIn("Buying a Train Ticket at the Station", client.prompts[0])
 
+    def test_excel_topic_history_is_injected_into_generation(self):
+        fixture = json.loads(
+            (project_root() / "tests" / "fixtures" / "sample_pack.json").read_text(
+                encoding="utf-8"
+            )
+        )["content"]
+        config = load_config()
+        client = _FakeGeminiClient(fixture)
+        ContentPackGenerator(config, client).create(
+            playlist=config.active_playlists[0],
+            history=[],
+            existing_topics=["Video 1: Booking a Doctor's Appointment"],
+            today=date(2026, 10, 25),
+        )
+        self.assertIn("checked-in Excel tracker", client.prompts[0])
+        self.assertIn("Booking a Doctor's Appointment", client.prompts[0])
+
     def test_validation_failure_gets_one_bounded_tutor_repair(self):
         fixture = json.loads(
             (project_root() / "tests" / "fixtures" / "sample_pack.json").read_text(

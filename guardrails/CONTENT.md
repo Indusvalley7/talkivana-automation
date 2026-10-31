@@ -9,6 +9,19 @@
 - A title collision must be repaired before rendering or upload. Never use a number suffix as the
   only distinction.
 
+## Topic-history uniqueness
+
+- Before every primary generation and revision, read the checked-in
+  `tracker/publishing_schedule.xlsx` Schedule Matrix and compare the proposed lessons with every
+  existing video and Short entry.
+- Supplement the workbook entries with current GitHub Issue history so a newly proposed or pending
+  pack cannot be repeated before the tracker refresh completes.
+- Do not repeat an existing broad lesson family by changing only the setting, wording, objects, or
+  title. If all configured starter areas are already represented, choose a genuinely different
+  practical A1 domain.
+- If the workbook is missing, unreadable, or lacks the expected video-title column, fail closed and
+  create no approval Issue.
+
 - Create exactly two vocabulary Shorts and two linked conversation lessons in every pack.
 - Every Short contains only Standard German words or verbs, their English meanings, part of speech,
   and simplified English pronunciation. No example sentences belong in a Short.
