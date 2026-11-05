@@ -6,7 +6,8 @@ const pages=[
   ["media","04","Media engine","media-engine.html","Chatterbox voice, visuals, thumbnails, and assembly"],
   ["approvals","05","Approval & publishing","approvals.html","Commands, retries, states, and schedule policy"],
   ["limits","06","Costs & limits","limits.html","Quotas, throttles, and capacity"],
-  ["operations","07","Operator recipes","operations.html","Setup, recovery, and analytics"]
+  ["infrastructure","07","Infrastructure & cost","infrastructure.html","Gemini accounting and the zero-fee stack"],
+  ["operations","08","Operator recipes","operations.html","Setup, recovery, and analytics"]
 ];
 const currentPage=document.body.dataset.page;
 const navHost=document.querySelector("[data-site-nav]");

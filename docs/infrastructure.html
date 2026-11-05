@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Infrastructure, Gemini request accounting, and the zero-mandatory-fee design of Talkivana Automation.">
+  <meta name="theme-color" content="#071c1d">
+  <title>Infrastructure & Cost · Talkivana Field Guide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/app.js" defer></script>
+</head>
+<body data-page="infrastructure">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="site-shell">
+    <aside class="sidebar" aria-label="Documentation navigation"><div data-site-nav></div></aside>
+    <main id="main" class="main-canvas">
+      <header class="mobile-bar"><a class="mini-brand" href="index.html"><span class="brand-mark">T</span> Talkivana</a><button class="icon-button" data-menu-toggle aria-expanded="false">Menu</button></header>
+
+      <section class="page-hero reveal">
+        <span class="chapter-tag">Chapter 07 · Infrastructure</span>
+        <h1>A small system with <em>no mandatory usage bill.</em></h1>
+        <p class="lede">Talkivana combines free-tier text generation, public-repository compute, local open-source media engines, and quota-based YouTube APIs. Nothing here means unlimited: the design stays at ₹0 by keeping the daily workload bounded and stopping visibly when a free allowance is unavailable.</p>
+      </section>
+
+      <div class="content-wrap">
+        <section class="content-section reveal">
+          <div class="cost-ledger" aria-label="Daily infrastructure summary">
+            <article><span>GEMINI · NORMAL DAY</span><strong>3</strong><small>structured requests for one four-asset pack</small></article>
+            <article><span>GEMINI · HARD GUARD</span><strong>8</strong><small>provider attempts per workflow run, including retries</small></article>
+            <article><span>YOUTUBE · OUTPUT</span><strong>4</strong><small>approved uploads for one daily pack</small></article>
+            <article><span>MANDATORY API FEES</span><strong>₹0</strong><small>while every service remains inside its free allowance</small></article>
+          </div>
+          <div class="callout" style="margin-top:18px"><strong>“Free” describes the current operating path, not a lifetime guarantee</strong><p>Provider limits, model availability, GitHub policy, and YouTube quotas can change. The automation does not promise infinite free capacity and it never switches itself to paid usage.</p></div>
+        </section>
+
+        <section class="content-section reveal">
+          <div class="content-intro"><div><p class="eyebrow">Infrastructure circuit</p><h2>Where the work actually runs</h2></div><p>GitHub is the control plane and temporary computer. Gemini is used only for language content. Speech, graphics, thumbnails, and video assembly run as software on the GitHub runner rather than as metered media APIs.</p></div>
+          <div class="infrastructure-map">
+            <article class="infra-node"><span>01 · ORCHESTRATE</span><h3>GitHub Actions</h3><p>Starts scheduled jobs, exposes each stage, stores short-lived artifacts, and passes approved work between gates.</p><small>Cost basis · standard <code>ubuntu-latest</code> runner in a public repository</small></article>
+            <article class="infra-node"><span>02 · THINK</span><h3>Gemini 3.5 Flash-Lite</h3><p>Creates the structured lesson pack, performs bilingual QA, and audits the final conversation for naturalness.</p><small>Cost basis · Gemini API free tier, bounded by project RPM/TPM/RPD</small></article>
+            <article class="infra-node"><span>03 · SPEAK</span><h3>Chatterbox V3</h3><p>Runs the open-source multilingual model against the fixed English and German reference voices.</p><small>Cost basis · no per-character service call; runner compute is the constraint</small></article>
+            <article class="infra-node"><span>04 · BUILD</span><h3>Pillow + FFmpeg</h3><p>Draws frames and thumbnails, aligns narration, and encodes the long videos and Shorts.</p><small>Cost basis · open-source packages using temporary runner CPU and disk</small></article>
+            <article class="infra-node"><span>05 · DELIVER</span><h3>YouTube APIs</h3><p>Uploads privately, applies metadata and thumbnails, schedules only approved assets, and reads analytics.</p><small>Cost basis · quota-limited API access with no per-upload API fee</small></article>
+          </div>
+        </section>
+
+        <section class="content-section reveal">
+          <div class="content-intro"><div><p class="eyebrow">Gemini accounting</p><h2>Requests, not prepaid credits</h2></div><p>The Gemini key does not contain a fixed wallet of credits. Google evaluates the project against model-specific requests per minute, tokens per minute, and requests per day. The active allowance is visible in AI Studio and daily request limits reset at midnight Pacific Time.</p></div>
+          <table class="data-table"><thead><tr><th>Content stage</th><th>Normal requests</th><th>Purpose</th><th>When it grows</th></tr></thead><tbody>
+            <tr><td>Initial pack</td><td>1</td><td>Two Shorts plus two linked twelve-turn conversations in structured JSON.</td><td>Never loops on its own.</td></tr>
+            <tr><td>Bilingual tutor QA</td><td>1</td><td>Checks meaning, Standard German, register, A1 suitability, and cross-links.</td><td>Provider failures may trigger a guarded retry.</td></tr>
+            <tr><td>Naturalness audit</td><td>1</td><td>Reads each German dialogue as one real scene and corrects artificial exchanges.</td><td>Provider failures may trigger a guarded retry.</td></tr>
+            <tr><td>Deterministic repair</td><td>0 normally</td><td>Repairs schema, title, vocabulary-link, or duplicate-topic validation failures.</td><td>Only when validation fails; the whole run stops at eight provider attempts.</td></tr>
+          </tbody></table>
+          <div class="split-panel" style="margin-top:18px">
+            <article class="info-card"><span class="pill good">NORMAL PATH</span><h3>Three calls per pack</h3><p>One daily pack normally needs three structured Gemini responses. The four lessons are generated together; it is not one paid call for every sentence, slide, or voice line.</p></article>
+            <article class="info-card"><span class="pill warn">FAIL-CLOSED PATH</span><h3>Eight attempts maximum</h3><p><code>max_generation_requests_per_run</code> is set to eight. If Gemini is slow, returns invalid output, reaches a project limit, or remains unavailable after retries, the workflow fails before creating an approval issue.</p></article>
+          </div>
+        </section>
+
+        <section class="content-section reveal">
+          <div class="content-intro"><div><p class="eyebrow">Why the bill stays at zero</p><h2>Every expensive-looking task has a non-metered path</h2></div><p>The saving does not come from one unlimited provider. It comes from assigning each task to a bounded free service or an open-source engine and avoiding paid fallbacks.</p></div>
+          <table class="data-table"><thead><tr><th>Layer</th><th>Why it currently costs ₹0</th><th>What can still stop it</th></tr></thead><tbody>
+            <tr><td>Workflow compute</td><td>GitHub documents standard hosted runners as free and unlimited for public repositories.</td><td>Runner availability, job timeout, fair-use rules, disk, cache, and artifact storage.</td></tr>
+            <tr><td>Language intelligence</td><td>The configured Flash-Lite model is used through the Gemini free tier; input and output remain inside the project allowance.</td><td>RPM, TPM, RPD, model eligibility, provider capacity, or a future pricing change.</td></tr>
+            <tr><td>Voice generation</td><td>Chatterbox Multilingual V3 is MIT-licensed code executed on the runner; Talkivana does not call a paid Resemble voice API.</td><td>Model download, memory, compute time, dependency changes, and the project now being archived research.</td></tr>
+            <tr><td>Visuals and encoding</td><td>Pillow and FFmpeg create assets locally on the runner, including thumbnails.</td><td>CPU time, temporary disk, malformed assets, and renderer timeouts.</td></tr>
+            <tr><td>YouTube delivery</td><td>The Data and Analytics APIs use quota rather than a per-upload invoice.</td><td>Daily project quota, OAuth, channel upload limits, thumbnail throttles, or policy checks.</td></tr>
+          </tbody></table>
+        </section>
+
+        <section class="content-section reveal">
+          <div class="content-intro"><div><p class="eyebrow">Capacity math</p><h2>Why normal usage does not immediately exhaust the allowances</h2></div><p>A regular day creates one pack, makes about three Gemini requests, and later uploads four approved assets. The media-heavy work does not consume Gemini tokens, and the daily provider counters reset on their own schedules.</p></div>
+          <div class="card-grid">
+            <article class="info-card"><span class="number">1 PACK / DAY</span><h3>Generation is consolidated</h3><p>Two Shorts and two long lessons are returned together, reducing model calls and keeping the review unit coherent.</p></article>
+            <article class="info-card"><span class="number">0 TTS API CREDITS</span><h3>Speech runs locally</h3><p>Chatterbox consumes compute time, not commercial characters or voice credits.</p></article>
+            <article class="info-card"><span class="number">DAILY RESET</span><h3>Quotas replenish</h3><p>Gemini request-per-day limits and YouTube daily quota reset rather than accumulating forever. Reset timing and active limits are provider-controlled.</p></article>
+            <article class="info-card"><span class="number">PUBLIC REPO</span><h3>Compute is not metered by minutes</h3><p>The workflows use standard Linux runners in a public repository, not paid larger runners.</p></article>
+            <article class="info-card"><span class="number">NO AUTO-UPGRADE</span><h3>A failure cannot create a surprise bill</h3><p>The workflow has no logic that enables billing, purchases quota, or silently selects a paid service.</p></article>
+            <article class="info-card"><span class="number">VISIBLE STOP</span><h3>Limits become workflow errors</h3><p>A missing approval request usually means an upstream job failed or was skipped; it does not mean the system spent money to continue elsewhere.</p></article>
+          </div>
+        </section>
+
+        <section class="content-section reveal">
+          <div class="content-intro"><div><p class="eyebrow">Official references</p><h2>Verify before increasing throughput</h2></div><p>These provider pages are authoritative. Talkivana's internal caps are intentionally smaller than external allowances, but external limits can change independently of this repository.</p></div>
+          <div class="recipe-list">
+            <details class="recipe" open><summary>Gemini API rate limits <span>Google AI Studio ↗</span></summary><div class="recipe-body"><p>Check the project's live RPM, TPM, and RPD values for <code>gemini-3.5-flash-lite</code>.</p><p><a href="https://ai.google.dev/gemini-api/docs/rate-limits">Open official Gemini rate limits</a></p></div></details>
+            <details class="recipe"><summary>Public-repository runner policy <span>GitHub Docs ↗</span></summary><div class="recipe-body"><p>GitHub documents standard hosted runners as free and unlimited for public repositories; larger runners and storage have different rules.</p><p><a href="https://docs.github.com/en/actions/how-tos/write-workflows/choose-where-workflows-run/choose-the-runner-for-a-job">Open official runner documentation</a></p></div></details>
+            <details class="recipe"><summary>YouTube quota calculator <span>Google for Developers ↗</span></summary><div class="recipe-body"><p>The current documentation lists separate daily buckets for <code>videos.insert</code> and <code>search.list</code>, plus 10,000 daily units for other endpoints.</p><p><a href="https://developers.google.com/youtube/data/determine_quota_cost">Open the official quota calculator</a></p></div></details>
+            <details class="recipe"><summary>Chatterbox source and licence <span>GitHub ↗</span></summary><div class="recipe-body"><p>The upstream repository identifies Chatterbox as open-source MIT-licensed archived research. That removes per-character fees, but also means Talkivana must own dependency maintenance.</p><p><a href="https://github.com/resemble-ai/chatterbox">Open the upstream repository</a></p></div></details>
+          </div>
+        </section>
+
+        <section class="content-section reveal"><div class="callout"><strong>Documentation reviewed · 5 November 2026</strong><p>Repository facts are taken from <code>config/channel.json</code> and the generation code. Provider facts are linked to their current official documentation. “₹0” remains true only while the repository stays public, standard runners are used, billing is not enabled for these calls, and daily usage remains inside active free allowances.</p></div></section>
+      </div>
+      <footer data-site-footer></footer>
+    </main>
+  </div>
+</body>
+</html>
