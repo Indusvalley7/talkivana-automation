@@ -254,6 +254,76 @@ class SchedulingTests(unittest.TestCase):
         self.assertEqual(actual_slots, assignments)
         self.assertEqual(catch_up, set())
 
+    def test_delayed_approval_fills_next_conveyor_day_instead_of_skipping_it(self):
+        record = ContentPackRecord.from_dict(json.loads(
+            (project_root() / "tests" / "fixtures" / "sample_pack.json").read_text(
+                encoding="utf-8"
+            )
+        ))
+        previous = {
+            "short-1": {"scheduled_at": "2026-11-05T07:30:00+05:30", "slot_local": "07:30"},
+            "short-2": {"scheduled_at": "2026-11-05T18:00:00+05:30", "slot_local": "18:00"},
+            "long-1": {"scheduled_at": "2026-11-06T12:30:00+05:30", "slot_local": "12:30"},
+            "long-2": {"scheduled_at": "2026-11-06T22:30:00+05:30", "slot_local": "22:30"},
+        }
+        assignments = {
+            "short-1": "07:30",
+            "long-1": "12:30",
+            "short-2": "18:00",
+            "long-2": "22:30",
+        }
+        short_date, long_date, actual_slots, publish_times, catch_up = (
+            _build_earliest_pack_schedule(
+                github=_ExistingSchedules([previous]),
+                config=load_config(),
+                record=record,
+                slot_by_asset=assignments,
+                strict_slot_assignments=True,
+                now=datetime(2026, 11, 6, 5, 0, tzinfo=timezone.utc),
+            )
+        )
+        self.assertEqual(short_date, date(2026, 11, 6))
+        self.assertEqual(long_date, date(2026, 11, 7))
+        self.assertEqual(actual_slots["short-2"], "18:00")
+        self.assertEqual(
+            publish_times["short-1"],
+            datetime(2026, 11, 6, 5, 5, tzinfo=timezone.utc),
+        )
+        self.assertEqual(catch_up, {"short-1"})
+
+    def test_next_pack_appends_after_latest_short_batch_even_when_clock_is_later(self):
+        record = ContentPackRecord.from_dict(json.loads(
+            (project_root() / "tests" / "fixtures" / "sample_pack.json").read_text(
+                encoding="utf-8"
+            )
+        ))
+        existing = [
+            {
+                "short-1": {"scheduled_at": "2026-11-07T07:30:00+05:30", "slot_local": "07:30"},
+                "short-2": {"scheduled_at": "2026-11-07T18:00:00+05:30", "slot_local": "18:00"},
+                "long-1": {"scheduled_at": "2026-11-08T12:30:00+05:30", "slot_local": "12:30"},
+                "long-2": {"scheduled_at": "2026-11-08T22:30:00+05:30", "slot_local": "22:30"},
+            }
+        ]
+        assignments = {
+            "short-1": "07:30",
+            "long-1": "12:30",
+            "short-2": "18:00",
+            "long-2": "22:30",
+        }
+        short_date, long_date, actual_slots, _, catch_up = _build_earliest_pack_schedule(
+            github=_ExistingSchedules(existing),
+            config=load_config(),
+            record=record,
+            slot_by_asset=assignments,
+            strict_slot_assignments=True,
+            now=datetime(2026, 11, 7, 20, 0, tzinfo=timezone.utc),
+        )
+        self.assertEqual(short_date, date(2026, 11, 8))
+        self.assertEqual(long_date, date(2026, 11, 9))
+        self.assertEqual(actual_slots, assignments)
+        self.assertEqual(catch_up, set())
+
 
 if __name__ == "__main__":
     unittest.main()

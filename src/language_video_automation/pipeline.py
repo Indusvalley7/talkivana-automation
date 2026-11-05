@@ -1263,11 +1263,6 @@ def _next_available_short_date(
     not_before: date | None = None,
     base_date: date | None = None,
 ) -> date:
-    candidate = max(
-        (base_date or date.today()) + timedelta(days=buffer_days),
-        date.fromisoformat(record.created_date) + timedelta(days=buffer_days),
-        not_before or date.min,
-    )
     used: set[date] = set()
     for other in github.list_issues(state="closed", labels=["talkivana", "pack-scheduled"]):
         if other.number == exclude_issue_number:
@@ -1276,6 +1271,24 @@ def _next_available_short_date(
             if not str(asset_id).startswith("short") or not asset.get("scheduled_at"):
                 continue
             used.add(datetime.fromisoformat(str(asset["scheduled_at"]).replace("Z", "+00:00")).date())
+
+    if used:
+        # Once the conveyor has started, its own latest scheduled Shorts batch is the
+        # source of truth. Advancing from the wall clock (today + buffer) made a failed
+        # or delayed production run skip a calendar day, which broke the intended
+        # overlap of today's Shorts with yesterday's long videos.
+        candidate = max(
+            max(used) + timedelta(days=1),
+            not_before or date.min,
+        )
+    else:
+        # The buffer is only a bootstrap rule. It gives the first pack review time;
+        # subsequent packs must remain consecutive even when approval is delayed.
+        candidate = max(
+            (base_date or date.today()) + timedelta(days=buffer_days),
+            date.fromisoformat(record.created_date) + timedelta(days=buffer_days),
+            not_before or date.min,
+        )
     while candidate in used:
         candidate += timedelta(days=1)
     return candidate
