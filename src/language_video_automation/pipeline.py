@@ -658,6 +658,7 @@ def _generate_record(
         request_timeout_seconds=float(
             config.raw["system"]["gemini_request_timeout_seconds"]
         ),
+        fallback_models=tuple(config.raw["models"].get("text_fallbacks", [])),
     )
     return ContentPackGenerator(config, client).create(
         playlist=playlist,

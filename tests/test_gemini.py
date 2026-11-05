@@ -36,6 +36,7 @@ def _client(outcomes: list[object]) -> tuple[GeminiClient, _Interactions]:
     client._min_interval_seconds = 0.0
     client._last_request_at = 0.0
     client._request_timeout_seconds = 123.0
+    client._fallback_models = ("fallback-model", "last-model")
     return client, interactions
 
 
@@ -56,6 +57,10 @@ class GeminiClientTests(unittest.TestCase):
 
         self.assertEqual(value, {"ok": True})
         self.assertEqual(len(interactions.calls), 2)
+        self.assertEqual(
+            [call["model"] for call in interactions.calls],
+            ["test-model", "fallback-model"],
+        )
         self.assertEqual(interactions.calls[0]["timeout"], 123.0)
         sleep.assert_called_once_with(10)
 
@@ -63,7 +68,7 @@ class GeminiClientTests(unittest.TestCase):
     def test_auth_error_does_not_retry(self, sleep) -> None:
         client, interactions = _client([_ProviderError("invalid API key", 401)])
 
-        with self.assertRaisesRegex(GeminiError, "after 1 attempt"):
+        with self.assertRaisesRegex(GeminiError, "after 1 model attempt"):
             client.generate_json(
                 model="test-model",
                 prompt="test prompt",

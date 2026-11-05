@@ -258,6 +258,12 @@ def validate_production_config(config: AppConfig) -> None:
             raise ConfigurationError("The enabled German playlist needs its YouTube playlist ID.")
     if not str(config.raw["models"].get("text", "")).strip():
         raise ConfigurationError("models.text is required.")
+    text_fallbacks = config.raw["models"].get("text_fallbacks", [])
+    if not isinstance(text_fallbacks, list) or not 1 <= len(text_fallbacks) <= 2:
+        raise ConfigurationError("models.text_fallbacks must contain one or two model IDs.")
+    text_models = [str(config.raw["models"]["text"]).strip(), *map(str, text_fallbacks)]
+    if any(not item.strip() for item in text_models) or len(set(text_models)) != len(text_models):
+        raise ConfigurationError("Gemini primary and fallback model IDs must be non-empty and distinct.")
     if not str(config.raw["models"].get("tts", "")).strip():
         raise ConfigurationError("models.tts is required.")
     if str(config.raw["models"].get("tts_provider", "")) != "chatterbox":

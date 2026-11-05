@@ -23,6 +23,7 @@ class GeminiClient:
         max_requests: int = 40,
         min_interval_seconds: float = 0,
         request_timeout_seconds: float = 180,
+        fallback_models: tuple[str, ...] | list[str] = (),
     ) -> None:
         key = api_key or os.environ.get("GEMINI_API_KEY", "")
         if not key:
@@ -39,6 +40,9 @@ class GeminiClient:
         if request_timeout_seconds <= 0:
             raise GeminiError("Gemini request timeout must be greater than zero.")
         self._request_timeout_seconds = float(request_timeout_seconds)
+        self._fallback_models = tuple(
+            dict.fromkeys(str(item).strip() for item in fallback_models if str(item).strip())
+        )
 
     @property
     def request_count(self) -> int:
@@ -62,17 +66,19 @@ class GeminiClient:
         operation: str = "JSON generation",
     ) -> dict[str, Any]:
         last_error: Exception | None = None
-        for attempt in range(3):
+        attempt_models = tuple(dict.fromkeys((model, *self._fallback_models)))[:3]
+        for attempt, attempt_model in enumerate(attempt_models):
             self._claim_request()
             started_at = time.monotonic()
             print(
-                f"Gemini stage '{operation}': attempt {attempt + 1}/3 "
+                f"Gemini stage '{operation}': attempt {attempt + 1}/{len(attempt_models)} "
+                f"with {attempt_model} "
                 f"(guard request {self._requests}/{self._max_requests}).",
                 flush=True,
             )
             try:
                 interaction = self._client.interactions.create(
-                    model=model,
+                    model=attempt_model,
                     input=prompt,
                     response_format={
                         "type": "text",
@@ -88,7 +94,7 @@ class GeminiClient:
                 if not isinstance(value, dict):
                     raise GeminiError("Gemini JSON response was not an object.")
                 print(
-                    f"Gemini stage '{operation}' completed in "
+                    f"Gemini stage '{operation}' completed with {attempt_model} in "
                     f"{time.monotonic() - started_at:.1f}s.",
                     flush=True,
                 )
@@ -101,21 +107,23 @@ class GeminiClient:
                 retryable = status_code not in {400, 401, 403, 404}
                 error_summary = _safe_error_summary(exc)
                 print(
-                    f"Gemini stage '{operation}' failed on attempt {attempt + 1}/3 "
+                    f"Gemini stage '{operation}' failed with {attempt_model} on attempt "
+                    f"{attempt + 1}/{len(attempt_models)} "
                     f"after {time.monotonic() - started_at:.1f}s: {error_summary}",
                     flush=True,
                 )
-                if attempt < 2 and retryable:
+                if attempt + 1 < len(attempt_models) and retryable:
                     delay = (10, 30)[attempt]
                     print(
-                        f"Retrying Gemini stage '{operation}' in {delay}s.",
+                        f"Retrying Gemini stage '{operation}' with the next configured "
+                        f"free-tier model in {delay}s.",
                         flush=True,
                     )
                     time.sleep(delay)
                     continue
                 break
         raise GeminiError(
-            f"Gemini stage '{operation}' failed after {attempt + 1} attempt(s): "
+            f"Gemini stage '{operation}' failed after {attempt + 1} model attempt(s): "
             f"{_safe_error_summary(last_error)}"
         ) from last_error
 
