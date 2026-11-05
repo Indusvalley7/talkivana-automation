@@ -107,6 +107,7 @@ Follow every repository guardrail below and return only the requested structured
             model=str(self.config.raw["models"]["text"]),
             prompt=prompt,
             schema=CONTENT_PACK_JSON_SCHEMA,
+            operation="initial content pack",
         )
         self._apply_fixed_fields(pack, playlist)
 
@@ -139,6 +140,7 @@ Pack:
             model=str(self.config.raw["models"]["text"]),
             prompt=qa_prompt,
             schema=QA_JSON_SCHEMA,
+            operation="bilingual Standard German QA",
         )
         corrected = qa.get("corrected_pack")
         if not isinstance(corrected, dict):
@@ -236,6 +238,7 @@ Pack to repair:
                 model=str(self.config.raw["models"]["text"]),
                 prompt=repair_prompt,
                 schema=QA_JSON_SCHEMA,
+                operation="deterministic validation repair",
             )
             replacement = repair.get("corrected_pack")
             if not isinstance(replacement, dict):
@@ -293,6 +296,7 @@ Pack to audit:
             model=str(self.config.raw["models"]["text"]),
             prompt=audit_prompt,
             schema=QA_JSON_SCHEMA,
+            operation="conversation naturalness audit",
         )
         corrected = audit.get("corrected_pack")
         if not isinstance(corrected, dict):

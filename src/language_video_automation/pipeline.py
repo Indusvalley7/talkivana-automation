@@ -653,7 +653,12 @@ def _generate_record(
     existing_topics: list[str] | tuple[str, ...] = (),
     today: date | None = None,
 ) -> ContentPackRecord:
-    client = GeminiClient(max_requests=int(config.raw["system"]["max_generation_requests_per_run"]))
+    client = GeminiClient(
+        max_requests=int(config.raw["system"]["max_generation_requests_per_run"]),
+        request_timeout_seconds=float(
+            config.raw["system"]["gemini_request_timeout_seconds"]
+        ),
+    )
     return ContentPackGenerator(config, client).create(
         playlist=playlist,
         history=history,

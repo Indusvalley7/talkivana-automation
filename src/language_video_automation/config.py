@@ -144,6 +144,12 @@ def _validate_shape(raw: dict[str, Any]) -> None:
     pending = int(raw["system"].get("max_pending_packs", 0))
     if not 1 <= pending <= 14:
         raise ConfigurationError("max_pending_packs must be between 1 and 14.")
+    generation_requests = int(raw["system"].get("max_generation_requests_per_run", 0))
+    if not 3 <= generation_requests <= 12:
+        raise ConfigurationError("max_generation_requests_per_run must be between 3 and 12.")
+    gemini_timeout = float(raw["system"].get("gemini_request_timeout_seconds", 0))
+    if not 30 <= gemini_timeout <= 300:
+        raise ConfigurationError("gemini_request_timeout_seconds must be between 30 and 300.")
     dry_run_asset = str(raw["system"].get("dry_run_asset_id", "")).strip()
     if dry_run_asset not in {"", "short-1", "short-2", "long-1", "long-2"}:
         raise ConfigurationError("dry_run_asset_id must be empty or a known Talkivana asset ID.")

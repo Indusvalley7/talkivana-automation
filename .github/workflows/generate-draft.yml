@@ -41,7 +41,7 @@ jobs:
     name: Content generation + Standard German QA
     needs: preflight
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -61,6 +61,13 @@ jobs:
           else
             python -m language_video_automation draft --repo "$GITHUB_REPOSITORY"
           fi
+
+      - name: Explain a failed content run
+        if: failure()
+        run: |
+          echo "## Content generation failed" >> "$GITHUB_STEP_SUMMARY"
+          echo "Open the failed generation step and find the last line beginning with **Gemini stage**." >> "$GITHUB_STEP_SUMMARY"
+          echo "It now identifies the exact phase, attempt, elapsed time, and safe provider error." >> "$GITHUB_STEP_SUMMARY"
 
   approval_gate:
     name: Content approval gate — waiting occurs in GitHub Issue

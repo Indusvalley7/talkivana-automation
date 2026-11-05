@@ -4,6 +4,7 @@
     "dry_run_asset_id": "",
     "schema_version": 2,
     "max_generation_requests_per_run": 8,
+    "gemini_request_timeout_seconds": 180,
     "max_tts_requests_per_pack": 180,
     "tts_min_interval_seconds": 0,
     "max_pending_packs": 7,
