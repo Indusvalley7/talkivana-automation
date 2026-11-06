@@ -170,15 +170,11 @@ def prepare_production_event(*, event_path: Path, repository: str, output_path: 
         Decision.RETRY_VIDEO,
     }
     resume_existing = command.decision is Decision.RESUME_VIDEO
-    expected_label = (
-        "pack-awaiting-video"
-        if replace_existing or resume_existing
-        else "pack-awaiting-content"
+    expected_label = _production_gate_for_command(
+        command.decision,
+        issue.labels,
+        issue_number=issue.number,
     )
-    if expected_label not in issue.labels:
-        raise PipelineError(
-            f"Issue #{issue.number} is not at the required {expected_label} approval gate."
-        )
     missing = _missing_youtube_secrets()
     if missing:
         github.update_issue(
@@ -241,6 +237,45 @@ def prepare_production_event(*, event_path: Path, repository: str, output_path: 
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(descriptor, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _production_gate_for_command(
+    decision: Decision,
+    labels: list[str] | tuple[str, ...],
+    *,
+    issue_number: int,
+) -> str:
+    """Resolve the safe approval gate for initial, retry, and resume commands.
+
+    A first production attempt can fail before any private-video manifest exists.
+    The failure controller deliberately restores that issue to
+    ``pack-failed + pack-awaiting-content``. Component retries must be accepted
+    from that failed-content state as well as from the later video-review gate.
+    """
+    label_set = set(labels)
+    retry_decisions = {
+        Decision.RETRY_VOICE,
+        Decision.RETRY_SLIDES,
+        Decision.RETRY_VIDEO,
+    }
+    if decision in retry_decisions:
+        if "pack-awaiting-video" in label_set:
+            return "pack-awaiting-video"
+        if {"pack-failed", "pack-awaiting-content"} <= label_set:
+            return "pack-awaiting-content"
+        raise PipelineError(
+            f"Issue #{issue_number} is not at a failed-content or video-review retry gate."
+        )
+    expected = (
+        "pack-awaiting-video"
+        if decision is Decision.RESUME_VIDEO
+        else "pack-awaiting-content"
+    )
+    if expected not in label_set:
+        raise PipelineError(
+            f"Issue #{issue_number} is not at the required {expected} approval gate."
+        )
+    return expected
 
 
 def run_production_voice_job(*, job_path: Path, asset_id: str, output_dir: Path) -> None:

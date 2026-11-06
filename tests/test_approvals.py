@@ -4,7 +4,12 @@ import unittest
 from pathlib import Path
 
 from language_video_automation.approvals import Decision, is_authorized, parse_approval_command
-from language_video_automation.pipeline import _missing_production_asset_ids, authorize_event
+from language_video_automation.pipeline import (
+    PipelineError,
+    _missing_production_asset_ids,
+    _production_gate_for_command,
+    authorize_event,
+)
 
 
 class ApprovalTests(unittest.TestCase):
@@ -47,6 +52,32 @@ class ApprovalTests(unittest.TestCase):
             }
         }
         self.assertEqual(_missing_production_asset_ids(manifest), ("long-2",))
+
+    def test_voice_retry_is_allowed_after_failure_before_private_upload(self):
+        self.assertEqual(
+            _production_gate_for_command(
+                Decision.RETRY_VOICE,
+                ["talkivana", "pack-failed", "pack-awaiting-content"],
+                issue_number=19,
+            ),
+            "pack-awaiting-content",
+        )
+        self.assertEqual(
+            _production_gate_for_command(
+                Decision.RETRY_VOICE,
+                ["talkivana", "pack-awaiting-video"],
+                issue_number=19,
+            ),
+            "pack-awaiting-video",
+        )
+
+    def test_voice_retry_is_rejected_before_approval_without_a_failure(self):
+        with self.assertRaises(PipelineError):
+            _production_gate_for_command(
+                Decision.RETRY_VOICE,
+                ["talkivana", "pack-awaiting-content"],
+                issue_number=19,
+            )
 
     def test_only_configured_actor(self):
         self.assertTrue(is_authorized("Indusvalley7", "Indusvalley7", "Indusvalley7"))
