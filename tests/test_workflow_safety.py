@@ -28,6 +28,13 @@ class WorkflowSafetyTests(unittest.TestCase):
         self.assertIn("*-thumbnail.jpg", text)
         self.assertEqual(text.count('"resume_video"'), 3)
 
+    def test_voice_generation_retries_from_segment_checkpoints(self):
+        text = (
+            project_root() / ".github" / "workflows" / "process-approval.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("for attempt in 1 2", text)
+        self.assertIn("retrying automatically from completed audio checkpoints", text)
+
     def test_thumbnail_backfill_is_manual_and_never_schedules_videos(self):
         text = (
             project_root() / ".github" / "workflows" / "refresh-thumbnails.yml"

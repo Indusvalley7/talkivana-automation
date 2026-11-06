@@ -953,6 +953,34 @@ def _fit_duration(
             remaining -= removed
             total -= removed
 
+    # If silent-spacing recovery is not enough, shorten only generic English
+    # tutor prompts, one at a time, until the lesson fits. Approved English
+    # meanings and every German utterance remain untouched and unmodified.
+    # This is intentionally an in-job recovery so a naturally slower
+    # Chatterbox render cannot fail an otherwise valid lesson at the end.
+    if total > maximum:
+        compact_candidates: list[tuple[int, str]] = []
+        for index, (segment, _, _) in enumerate(resolved):
+            compact = _compact_tutor_transcript(segment)
+            if compact and len(compact) < len(segment.transcript):
+                compact_candidates.append((index, compact))
+        compact_candidates.sort(
+            key=lambda item: len(resolved[item[0]][0].transcript) - len(item[1]),
+            reverse=True,
+        )
+        for index, compact in compact_candidates:
+            segment, _, old_duration = resolved[index]
+            replacement = replace(segment, transcript=compact)
+            path, new_duration = _synthesize_cached(
+                replacement, speech, audio_dir, cache
+            )
+            if new_duration >= old_duration:
+                continue
+            resolved[index] = (replacement, path, new_duration)
+            total -= old_duration - new_duration
+            if total <= maximum - 0.75:
+                break
+
     # Fit the target length by giving the learner intentional response time.
     # Never append duplicate lesson material after the German-only conversation.
     if total < target:
@@ -997,6 +1025,27 @@ def _fit_duration(
     return resolved
 
 
+def _compact_tutor_transcript(segment: NarrationSegment) -> str | None:
+    """Return a shorter pedagogical cue for recoverable tutor-only narration."""
+    if segment.spoken_language.casefold() == "german":
+        return None
+    eyebrow = segment.eyebrow.upper()
+    cue = segment.cue_text.upper()
+    if "FULL CONVERSATION" in eyebrow:
+        return "Now hear the full conversation in German."
+    if "CHECKPOINT" in eyebrow:
+        return "Great work. Continue."
+    if "TUTOR" in eyebrow and cue == "GET READY TO REPEAT":
+        return "Listen again, then repeat."
+    if "TUTOR" in eyebrow:
+        return "English meaning."
+    if segment.display_mode == "intro":
+        return "Welcome. Let's begin."
+    if segment.display_mode == "conversation_intro":
+        return "Now listen to the conversation."
+    return None
+
+
 def _synthesize_cached(
     segment: NarrationSegment,
     speech: SpeechProvider,
@@ -1009,8 +1058,29 @@ def _synthesize_cached(
     if key in cache:
         return cache[key]
     path = audio_dir / f"{key}.wav"
-    speech.synthesize(segment, path)
-    duration = _wav_duration(path)
+    # A previous attempt may have completed this segment before a later
+    # segment failed. Treat every valid file as a durable local checkpoint so
+    # the automatic retry resumes instead of rebuilding a long lesson.
+    if path.is_file():
+        try:
+            duration = _wav_duration(path)
+            if 0.3 <= duration <= 120:
+                cache[key] = (path, duration)
+                return path, duration
+        except (OSError, RenderError):
+            pass
+        path.unlink(missing_ok=True)
+
+    partial = path.with_name(f"{path.stem}.partial.wav")
+    partial.unlink(missing_ok=True)
+    try:
+        speech.synthesize(segment, partial)
+        duration = _wav_duration(partial)
+        if not 0.3 <= duration <= 120:
+            raise RenderError(f"Unexpected narration duration {duration:.1f}s.")
+        partial.replace(path)
+    finally:
+        partial.unlink(missing_ok=True)
     if not 0.3 <= duration <= 120:
         raise RenderError(f"Unexpected narration duration {duration:.1f}s.")
     cache[key] = (path, duration)

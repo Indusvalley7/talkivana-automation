@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 import wave
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -12,6 +13,7 @@ from language_video_automation.renderer import (
     TestToneSpeechProvider,
     _fit_duration,
     _select_visual_style,
+    _synthesize_cached,
     build_asset_timeline,
     prepare_asset_voice_stage,
 )
@@ -226,6 +228,89 @@ class RendererTimelineTests(unittest.TestCase):
         self.assertAlmostEqual(
             sum(duration + segment.pause_seconds for segment, _, duration in fitted),
             329.25,
+        )
+
+    def test_voice_cache_reuses_a_valid_checkpoint_after_retry(self):
+        segment = NarrationSegment(
+            eyebrow="LESSON 1 OF 1 • TUTOR",
+            title="Tutor",
+            body="Guidance",
+            transcript="Listen carefully.",
+            spoken_language="English",
+            pause_seconds=1.0,
+            accent="primary",
+            display_mode="lesson",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            audio_dir = Path(temporary)
+            first_provider = TestToneSpeechProvider()
+            first = _synthesize_cached(segment, first_provider, audio_dir, {})
+            second_provider = TestToneSpeechProvider()
+            second = _synthesize_cached(segment, second_provider, audio_dir, {})
+
+        self.assertEqual(first, second)
+        self.assertEqual(first_provider.request_count, 1)
+        self.assertEqual(second_provider.request_count, 0)
+
+    def test_overlength_fit_compacts_tutor_audio_but_not_german(self):
+        tutor_one = NarrationSegment(
+            eyebrow="LESSON 1 OF 2 • TUTOR",
+            title="Tutor",
+            body="Guidance",
+            transcript="Excellent work. Now listen very carefully once more and repeat the phrase aloud.",
+            spoken_language="English",
+            pause_seconds=0.1,
+            accent="primary",
+            display_mode="lesson",
+            cue_text="GET READY TO REPEAT",
+        )
+        tutor_two = replace(
+            tutor_one,
+            eyebrow="LESSON 2 OF 2 • TUTOR",
+            transcript="Let us hear the English meaning before practising the German sentence together.",
+            cue_text="LISTEN",
+        )
+        german = NarrationSegment(
+            eyebrow="LESSON 1 OF 2 • REPEAT",
+            title="Guten Tag",
+            body="Repeat aloud",
+            transcript="Guten Tag",
+            spoken_language="German",
+            pause_seconds=0.1,
+            accent="secondary",
+            display_mode="lesson",
+        )
+        resolved = [
+            (tutor_one, Path("tutor-one.wav"), 30.0),
+            (tutor_two, Path("tutor-two.wav"), 30.0),
+            (german, Path("german.wav"), 275.0),
+        ]
+
+        with tempfile.TemporaryDirectory() as temporary:
+            fitted = _fit_duration(
+                resolved,
+                asset={"asset_id": "long-1"},
+                kind="long",
+                speech=TestToneSpeechProvider(),
+                audio_dir=Path(temporary),
+                cache={},
+                minimum=270.0,
+                target=300.0,
+                maximum=330.0,
+                max_practice_pause=6.0,
+            )
+
+        changed_tutors = [
+            segment.transcript
+            for segment, _, _ in fitted[:2]
+            if segment.transcript not in {tutor_one.transcript, tutor_two.transcript}
+        ]
+        self.assertTrue(changed_tutors)
+        self.assertEqual(fitted[2][0], german)
+        self.assertEqual(fitted[2][2], 275.0)
+        self.assertLessEqual(
+            sum(duration + segment.pause_seconds for segment, _, duration in fitted),
+            330.0,
         )
 
 
