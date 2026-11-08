@@ -57,6 +57,18 @@ _TOPIC_FAMILY_PATTERNS: dict[str, tuple[str, ...]] = {
 }
 
 
+_TOPIC_ACTION_PATTERNS: dict[str, tuple[str, ...]] = {
+    "ask_directions": ("ask for directions", "find", "navigate", "where is"),
+    "book": ("book", "booking", "make an appointment", "schedule", "scheduling"),
+    "buy": ("buy", "buying", "pay", "paying", "purchase"),
+    "check_in": ("check in", "checking in", "registration"),
+    "introduce": ("introduce", "introducing", "introduction", "meet", "meeting"),
+    "order": ("order", "ordering", "would like"),
+    "rent": ("rent", "renting"),
+    "travel": ("board", "boarding", "catch", "catching", "depart", "departure"),
+}
+
+
 def load_excel_video_history(path: Path) -> list[str]:
     """Read every tracked video/Short heading from the checked-in schedule workbook."""
     if not path.is_file():
@@ -127,11 +139,22 @@ def topic_families(text: str) -> set[str]:
     }
 
 
+def topic_actions(text: str) -> set[str]:
+    normalized = _normalized_text(text)
+    return {
+        action
+        for action, patterns in _TOPIC_ACTION_PATTERNS.items()
+        if any(_phrase_present(normalized, pattern) for pattern in patterns)
+    }
+
+
 def topics_are_repeated(candidate: str, existing: str) -> bool:
-    """Detect the same broad lesson family or a strong lexical near-duplicate."""
+    """Detect the same practical scenario without banning an entire broad category."""
     candidate_families = topic_families(candidate)
     existing_families = topic_families(existing)
-    if candidate_families & existing_families:
+    candidate_actions = topic_actions(candidate)
+    existing_actions = topic_actions(existing)
+    if candidate_families & existing_families and candidate_actions & existing_actions:
         return True
 
     left = set(_topic_tokens(candidate))

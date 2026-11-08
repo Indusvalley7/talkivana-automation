@@ -44,6 +44,28 @@ class TopicHistoryTests(unittest.TestCase):
             )
         )
 
+    def test_broad_category_does_not_block_a_new_specific_scenario(self):
+        self.assertFalse(
+            topics_are_repeated(
+                "Renting a storage locker at the train station",
+                "Short 1: German Public Transport Vocabulary",
+            )
+        )
+        self.assertFalse(
+            topics_are_repeated(
+                "Buying pens and notebooks at a stationery shop",
+                "Short 2: Classroom Materials and Study Tools in German",
+            )
+        )
+
+    def test_same_family_and_action_still_blocks_semantic_repetition(self):
+        self.assertTrue(
+            topics_are_repeated(
+                "Booking a consultation with a doctor",
+                "Scheduling an appointment at the clinic",
+            )
+        )
+
     def test_pack_validation_rejects_an_existing_excel_topic(self):
         fixture = json.loads(
             (project_root() / "tests" / "fixtures" / "sample_pack.json").read_text(
