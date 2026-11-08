@@ -75,6 +75,8 @@ Non-negotiable configuration:
 - Every linked Short vocabulary item must reappear naturally in its long video's German dialogue.
   Natural article/case changes, noun plurals, and ordinary verb conjugation are allowed; never
   distort German merely to reproduce a dictionary form verbatim.
+- Each Short and its linked long video must describe the same setting, speaker roles, and practical
+  goal. Never attach a newly named Short topic to an old or unrelated long-video scenario.
 - Each dialogue turn is spoken later as English once, German once, then German repeated once
 - After the teaching sequence, replay the complete coherent conversation in German only, once
 - Each conversation must progress naturally so the final German-only pass works as a single scene
@@ -209,11 +211,35 @@ Pack:
                     raise
                 validation_error = str(exc)
 
+            normalized_validation_error = validation_error.casefold()
+            force_full_pair_replacement = (
+                attempt == maximum_attempts - 1
+                and (
+                    "lesson topics must be materially different" in normalized_validation_error
+                    or "audience-facing titles" in normalized_validation_error
+                )
+            )
+            replacement_instruction = (
+                """
+This is the final bounded repair attempt after an earlier repair left a topic/title collision.
+Do not rename one field in isolation. For every implicated lesson, replace the complete linked
+Short/long pair with a genuinely new everyday situation: Short topic, Short title, all Short
+items, long-video title, scenario, learning objective, focus vocabulary, tutor guidance, and the
+entire dialogue. The Short and long video must share exactly one setting and practical goal. The
+two replacement pairs must also be materially different from each other and from every reserved
+title and Excel-history entry below.
+""".strip()
+                if force_full_pair_replacement
+                else ""
+            )
+
             repair_prompt = f"""
 Act as the final Talkivana Language Learning Companion repair editor. The otherwise reviewed pack
 failed deterministic validation for these exact reasons:
 
 {validation_error}
+
+{replacement_instruction}
 
 Return a complete corrected pack. Fix every listed defect while preserving all valid content,
 natural CEFR A1 Standard German, stable speaker roles, consistent du/Sie register, and the complete
@@ -226,6 +252,9 @@ All four titles must also remain distinct from these existing audience-facing ti
 {json.dumps(list(reserved_titles), ensure_ascii=False)}
 Both lesson topics must remain materially different from these Excel tracker entries:
 {json.dumps(list(existing_topics), ensure_ascii=False)}
+Never solve a topic collision by changing only the Short topic/title while keeping the colliding
+long-video title, scenario, learning objective, or dialogue. Keep each linked pair semantically
+coherent from its heading through its final conversation.
 Record each material repair in problems. Do not merely explain the error.
 
 Guardrails:
