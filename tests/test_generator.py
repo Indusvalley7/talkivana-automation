@@ -74,6 +74,24 @@ class _FullPairRepairGeminiClient(_FakeGeminiClient):
         }
 
 
+class _FreshPackFallbackGeminiClient(_FullPairRepairGeminiClient):
+    def generate_json(self, **kwargs):
+        if kwargs["operation"] == "fresh pack after collision":
+            self.calls += 1
+            self.prompts.append(kwargs["prompt"])
+            return copy.deepcopy(self.replacement_pack)
+        if kwargs["operation"] == "deterministic validation repair":
+            self.calls += 1
+            self.prompts.append(kwargs["prompt"])
+            self.repair_calls += 1
+            return {
+                "approved": True,
+                "problems": [],
+                "corrected_pack": copy.deepcopy(self.pack),
+            }
+        return super().generate_json(**kwargs)
+
+
 class GeneratorTests(unittest.TestCase):
     def test_natural_german_inflections_and_separable_verbs_count_as_linked_vocabulary(self):
         self.assertTrue(_german_vocabulary_used("frisch", "Wir kaufen frische Brötchen."))
@@ -234,6 +252,44 @@ class GeneratorTests(unittest.TestCase):
         self.assertNotIn("final bounded repair attempt", repair_prompts[0])
         self.assertIn("replace the complete linked", repair_prompts[1])
         self.assertIn("Never solve a topic collision", repair_prompts[1])
+
+    def test_ignored_collision_repairs_trigger_one_clean_slate_pack(self):
+        fixture = json.loads(
+            (project_root() / "tests" / "fixtures" / "sample_pack.json").read_text(
+                encoding="utf-8"
+            )
+        )["content"]
+        replacement = copy.deepcopy(fixture)
+        replacement["shorts"][0]["topic"] = "checking into a hotel"
+        replacement["shorts"][0]["title"] = "German Words for a Hotel Arrival"
+        replacement["long_videos"][0]["title"] = "Checking Into a Hotel in German"
+        replacement["long_videos"][0]["scenario"] = "A guest checks in at a hotel desk."
+        replacement["long_videos"][0]["learning_objective"] = (
+            "Check in politely and understand the receptionist's basic questions."
+        )
+        replacement["shorts"][1]["topic"] = "borrowing a library book"
+        replacement["shorts"][1]["title"] = "German Words for the Library Desk"
+        replacement["long_videos"][1]["title"] = "Borrowing a Library Book in German"
+        replacement["long_videos"][1]["scenario"] = "A visitor borrows a library book."
+        replacement["long_videos"][1]["learning_objective"] = (
+            "Borrow a book and understand a simple due-date response."
+        )
+        config = load_config()
+        client = _FreshPackFallbackGeminiClient(fixture, replacement)
+
+        record = ContentPackGenerator(config, client).create(
+            playlist=config.active_playlists[0],
+            history=[],
+            existing_topics=["Video 1: Meeting a New Neighbor for Morning Coffee in German"],
+            today=date(2026, 11, 8),
+        )
+
+        self.assertEqual(record.content["shorts"][0]["topic"], "checking into a hotel")
+        fresh_prompts = [
+            prompt for prompt in client.prompts if "clean slate" in prompt
+        ]
+        self.assertEqual(len(fresh_prompts), 1)
+        self.assertIn("Rejected concepts that are forbidden", fresh_prompts[0])
 
 
 if __name__ == "__main__":

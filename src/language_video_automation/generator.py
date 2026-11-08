@@ -155,6 +155,7 @@ Pack:
             reserved_titles=previous_headings,
             existing_topics=tracked_topics,
             maximum_attempts=3,
+            allow_fresh_collision_regeneration=True,
         )
         qa_problems.extend(repair_problems)
         corrected, audit_problems = self._audit_conversation_naturalness(
@@ -193,6 +194,7 @@ Pack:
         reserved_titles: list[str] | tuple[str, ...],
         existing_topics: list[str] | tuple[str, ...],
         maximum_attempts: int,
+        allow_fresh_collision_regeneration: bool = False,
     ) -> tuple[dict, list[str]]:
         """Give the tutor reviewer a bounded chance to repair schema-level content defects."""
         corrected = pack
@@ -208,6 +210,21 @@ Pack:
                 return corrected, problems
             except ContentValidationError as exc:
                 if attempt == maximum_attempts:
+                    validation_error = str(exc)
+                    if allow_fresh_collision_regeneration and self._is_collision_error(
+                        validation_error
+                    ):
+                        replacement = self._regenerate_after_collision(
+                            corrected,
+                            playlist=playlist,
+                            reserved_titles=reserved_titles,
+                            existing_topics=existing_topics,
+                            validation_error=validation_error,
+                        )
+                        problems.append(
+                            "Clean-slate collision regeneration: " + validation_error
+                        )
+                        return replacement, problems
                     raise
                 validation_error = str(exc)
 
@@ -278,6 +295,97 @@ Pack to repair:
             problems.extend(str(item) for item in repair.get("problems", []))
 
         raise AssertionError("Validation repair loop ended unexpectedly.")
+
+    @staticmethod
+    def _is_collision_error(validation_error: str) -> bool:
+        normalized = validation_error.casefold()
+        return (
+            "lesson topics must be materially different" in normalized
+            or "audience-facing titles must be distinct" in normalized
+        )
+
+    def _regenerate_after_collision(
+        self,
+        failed_pack: dict,
+        *,
+        playlist: Playlist,
+        reserved_titles: list[str] | tuple[str, ...],
+        existing_topics: list[str] | tuple[str, ...],
+        validation_error: str,
+    ) -> dict:
+        """Replace a repeatedly colliding draft without anchoring on its lesson content."""
+        content = self.config.raw["content"]
+        forbidden_failed_concepts: list[dict[str, str]] = []
+        longs = {
+            str(item.get("linked_short_asset_id", "")): item
+            for item in failed_pack.get("long_videos", [])
+            if isinstance(item, dict)
+        }
+        for short in failed_pack.get("shorts", []):
+            if not isinstance(short, dict):
+                continue
+            long_video = longs.get(str(short.get("asset_id", "")), {})
+            forbidden_failed_concepts.append(
+                {
+                    "short_topic": str(short.get("topic", "")),
+                    "short_title": str(short.get("title", "")),
+                    "long_title": str(long_video.get("title", "")),
+                    "scenario": str(long_video.get("scenario", "")),
+                }
+            )
+
+        prompt = f"""
+Create a completely fresh Talkivana daily content pack from a clean slate. Two earlier focused
+repairs ignored a title/topic collision, so do not edit, paraphrase, or retain either rejected
+lesson concept. Choose two different practical CEFR A1 situations instead.
+
+The final validation error was:
+{validation_error}
+
+Rejected concepts that are forbidden in this replacement:
+{json.dumps(forbidden_failed_concepts, ensure_ascii=False)}
+
+All previously uploaded, scheduled, or proposed audience-facing titles are forbidden:
+{json.dumps(list(reserved_titles), ensure_ascii=False)}
+
+All checked-in Excel topic-history entries are forbidden as repeated scenarios:
+{json.dumps(list(existing_topics), ensure_ascii=False)}
+
+Requirements:
+- Source language: {self.config.raw['channel']['source_language']}
+- Target language: {playlist.target_language}
+- Variety: {playlist.variety}
+- Level: {self.config.raw['channel']['level']}
+- Exactly two Shorts (short-1 and short-2) and two linked long videos (long-1 and long-2)
+- Pair short-1 with long-1 and short-2 with long-2
+- Exactly {int(content['words_per_short'])} vocabulary items per Short
+- Exactly {int(content['dialogue_turns_per_long'])} alternating A/B turns per long video
+- Each Short and linked long video must share one setting, speaker roles, vocabulary, and goal
+- The two pairs must use different setting-and-action combinations from one another
+- Standard German only, simplified-English pronunciation, family-safe, absolute-beginner content
+- Speaker A starts; every dialogue has a natural opening, practical resolution, and closing
+- Every linked Short vocabulary item appears naturally in its long-video German dialogue
+- Titles must be specific and genuinely distinct; adding “German” never makes a reused title new
+
+Return only the complete structured content pack.
+
+Guardrails:
+{self.guardrails}
+""".strip()
+        replacement = self.client.generate_json(
+            model=str(self.config.raw["models"]["text"]),
+            prompt=prompt,
+            schema=CONTENT_PACK_JSON_SCHEMA,
+            operation="fresh pack after collision",
+        )
+        self._apply_fixed_fields(replacement, playlist)
+        self._validate(
+            replacement,
+            playlist,
+            reserved_titles=reserved_titles,
+            existing_topics=existing_topics,
+        )
+        return replacement
 
     def _audit_conversation_naturalness(
         self,
