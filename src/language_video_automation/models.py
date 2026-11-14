@@ -199,10 +199,49 @@ def _german_vocabulary_used(term: str, corpus: str) -> bool:
     if not content_words:
         content_words = term_words
 
+    # An explicit German article marks a single taught content word as a noun. Natural
+    # beginner dialogue commonly uses its plural instead: der Apfel -> Äpfel. Keep the
+    # new noun plural expansion limited to explicitly article-marked vocabulary.
+    article_marked_noun = (
+        len(content_words) == 1
+        and any(word in _GERMAN_ARTICLES for word in term_words)
+    )
+
     for word in content_words:
+        if article_marked_noun and _german_noun_family_used(word, corpus_words):
+            continue
         if not _german_word_family_used(word, corpus_words):
             return False
     return bool(content_words)
+
+
+def _single_umlaut_variants(value: str) -> set[str]:
+    """Return variants with one possible noun-root vowel umlauted."""
+    variants: set[str] = set()
+    for index, letter in enumerate(value):
+        replacement = {"a": "ä", "o": "ö", "u": "ü"}.get(letter)
+        if replacement:
+            variants.add(f"{value[:index]}{replacement}{value[index + 1:]}")
+    return variants
+
+
+def _german_noun_family_used(word: str, corpus_words: set[str]) -> bool:
+    """Recognize conservative singular/plural forms for an article-marked noun."""
+    stems = {word, *_single_umlaut_variants(word)}
+    candidates = {
+        f"{stem}{ending}"
+        for stem in stems
+        for ending in ("", "e", "en", "er", "n", "s")
+    }
+    if word.endswith("in"):
+        feminine_stem = word[:-2]
+        candidates.add(f"{feminine_stem}innen")
+        candidates.update(
+            f"{variant}innen" for variant in _single_umlaut_variants(feminine_stem)
+        )
+    if word.endswith("nis"):
+        candidates.add(f"{word}se")
+    return bool(corpus_words.intersection(candidates))
 
 
 _SEPARABLE_PREFIXES = (

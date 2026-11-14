@@ -98,6 +98,15 @@ class GeneratorTests(unittest.TestCase):
         self.assertTrue(_german_vocabulary_used("abfahren", "Der Zug fährt um acht Uhr ab."))
         self.assertFalse(_german_vocabulary_used("abfahren", "Der Zug kommt um acht Uhr an."))
 
+    def test_article_marked_nouns_accept_natural_german_plural_forms(self):
+        self.assertTrue(_german_vocabulary_used("der Apfel", "Ich kaufe Äpfel."))
+        self.assertTrue(_german_vocabulary_used("der Bahnhof", "Wo sind die Bahnhöfe?"))
+        self.assertTrue(_german_vocabulary_used("die Ärztin", "Die Ärztinnen helfen uns."))
+        self.assertFalse(_german_vocabulary_used("der Apfel", "Ich kaufe Birnen."))
+
+    def test_unmarked_items_do_not_receive_article_marked_noun_expansion(self):
+        self.assertFalse(_german_vocabulary_used("Apfel", "Ich kaufe Äpfel."))
+
     def test_configuration_owned_metadata_is_normalized_before_approval(self):
         fixture = json.loads(
             (project_root() / "tests" / "fixtures" / "sample_pack.json").read_text(
