@@ -1,6 +1,6 @@
 # Talkivana video tracker
 
-This view is generated from approval Issues, YouTube status, and timing-agent data. Showing all 92 records. 
+This view is generated from approval Issues, YouTube status, and timing-agent data. Showing all 96 records. 
 The CSV file in this folder contains the complete analysis-ready history.
 
 | No. | Video / Short | Description | Approval | Reason | Publishing date | Published | YouTube |
@@ -95,5 +95,9 @@ The CSV file in this folder contains the complete analysis-ready history.
 | 88 | Video 2: Returning Empty Bottles at the Supermarket in German | Learn how to return empty bottles, ask about deposit slips, and complete a recycling stop in German. Talkivana — Real Conversations. #LearnGerman #GermanConversation #A1German | Approved | Final videos approved; publication scheduled. | 2026-11-13T22:30+05:30 | Yes | [Open](https://youtu.be/4d-EI9LawTs) |
 | 89 | Short 1: Essential Furniture Store Words in German | Learn essential furniture store vocabulary in German. Talkivana — Real Conversations. #LearnGerman #GermanVocabulary #BeginnerGerman | Approved | Final videos approved; publication scheduled. | 2026-11-13T07:30+05:30 | Yes | [Open](https://youtu.be/HKV3jQHhvKg) |
 | 90 | Short 2: Essential Community Centre Terms in German | Discover useful community centre vocabulary in German. Talkivana — Real Conversations. #LearnGerman #GermanVocabulary #BeginnerGerman | Approved | Final videos approved; publication scheduled. | 2026-11-13T18:00+05:30 | Yes | [Open](https://youtu.be/BBWTKBc7Syw) |
-| 91 | Video 1: Buying a Sofa at the Furniture Store in German | Learn how to shop for furniture in German with a real conversation at a furniture store. Talkivana — Real Conversations. #LearnGerman #GermanDialogue #BeginnerGerman | Approved | Final videos approved; publication scheduled. | 2026-11-14T12:30+05:30 | No | [Open](https://youtu.be/X1xbwQ4G_68) |
+| 91 | Video 1: Buying a Sofa at the Furniture Store in German | Learn how to shop for furniture in German with a real conversation at a furniture store. Talkivana — Real Conversations. #LearnGerman #GermanDialogue #BeginnerGerman | Approved | Final videos approved; publication scheduled. | 2026-11-14T12:30+05:30 | Yes | [Open](https://youtu.be/X1xbwQ4G_68) |
 | 92 | Video 2: Finding a Language Course at the Community Centre in German | Learn how to find and register for a community centre course in German. Talkivana — Real Conversations. #LearnGerman #GermanDialogue #BeginnerGerman | Approved | Final videos approved; publication scheduled. | 2026-11-14T22:30+05:30 | No | [Open](https://youtu.be/JlSKmvpa0CE) |
+| 93 | Short 1: Essential Orchard Apple and Harvest Words | Essential vocabulary for picking fresh apples at an orchard. Talkivana — Real Conversations. | Pending | Pending final video review. | — | No | [Open](https://youtu.be/YUWjJ63c2nk) |
+| 94 | Short 2: Essential Orchard Cider and Farm Drink Terms | Essential vocabulary for choosing local drinks at an orchard. Talkivana — Real Conversations. | Pending | Pending final video review. | — | No | [Open](https://youtu.be/s86M8367Wbk) |
+| 95 | Video 1: Picking Fresh Apples at the Orchard in German | Learn German with this absolute beginner conversation at an apple orchard. Discover how to ask for fresh fruit, discuss prices, and complete a simple purchase. | Pending | Pending final video review. | — | No | [Open](https://youtu.be/oqWJ-4c8-vA) |
+| 96 | Video 2: Tasting Orchard Apple Juice at the Farm Stand in German | Learn German with this absolute beginner conversation at an orchard stand. Discover how to ask about local juice, discuss sweet farm drinks, and complete a purchase. | Pending | Pending final video review. | — | No | [Open](https://youtu.be/O9HcQ5LSXsE) |
