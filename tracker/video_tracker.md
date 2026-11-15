@@ -1,6 +1,6 @@
 # Talkivana video tracker
 
-This view is generated from approval Issues, YouTube status, and timing-agent data. Showing all 96 records. 
+This view is generated from approval Issues, YouTube status, and timing-agent data. Showing all 100 records. 
 The CSV file in this folder contains the complete analysis-ready history.
 
 | No. | Video / Short | Description | Approval | Reason | Publishing date | Published | YouTube |
@@ -99,5 +99,9 @@ The CSV file in this folder contains the complete analysis-ready history.
 | 92 | Video 2: Finding a Language Course at the Community Centre in German | Learn how to find and register for a community centre course in German. Talkivana — Real Conversations. #LearnGerman #GermanDialogue #BeginnerGerman | Approved | Final videos approved; publication scheduled. | 2026-11-14T22:30+05:30 | Yes | [Open](https://youtu.be/JlSKmvpa0CE) |
 | 93 | Short 1: Essential Orchard Apple and Harvest Words | Essential vocabulary for picking fresh apples at an orchard. Talkivana — Real Conversations. | Approved | Final videos approved; publication scheduled. | 2026-11-15T00:45+05:30 | Yes | [Open](https://youtu.be/YUWjJ63c2nk) |
 | 94 | Short 2: Essential Orchard Cider and Farm Drink Terms | Essential vocabulary for choosing local drinks at an orchard. Talkivana — Real Conversations. | Approved | Final videos approved; publication scheduled. | 2026-11-15T01:15+05:30 | Yes | [Open](https://youtu.be/s86M8367Wbk) |
-| 95 | Video 1: Picking Fresh Apples at the Orchard in German | Learn German with this absolute beginner conversation at an apple orchard. Discover how to ask for fresh fruit, discuss prices, and complete a simple purchase. | Approved | Final videos approved; publication scheduled. | 2026-11-15T12:30+05:30 | No | [Open](https://youtu.be/oqWJ-4c8-vA) |
+| 95 | Video 1: Picking Fresh Apples at the Orchard in German | Learn German with this absolute beginner conversation at an apple orchard. Discover how to ask for fresh fruit, discuss prices, and complete a simple purchase. | Approved | Final videos approved; publication scheduled. | 2026-11-15T12:30+05:30 | Yes | [Open](https://youtu.be/oqWJ-4c8-vA) |
 | 96 | Video 2: Tasting Orchard Apple Juice at the Farm Stand in German | Learn German with this absolute beginner conversation at an orchard stand. Discover how to ask about local juice, discuss sweet farm drinks, and complete a purchase. | Approved | Final videos approved; publication scheduled. | 2026-11-15T22:30+05:30 | No | [Open](https://youtu.be/O9HcQ5LSXsE) |
+| 97 | Short 1: Essential Tech Support and Device Terms in German | Learn essential German words for discussing tech support, including computer, slow, and to help. Talkivana — Real Conversations. #LearnGerman #GermanVocabulary #BasicGerman | Pending | Pending content review. | — | No | — |
+| 98 | Short 2: Essential Laundry and Dry Cleaning Words in German | Learn essential German words for dropping off garments at a service counter, including jacket, clean, and tomorrow. Talkivana — Real Conversations. #LearnGerman #GermanVocabulary #BasicGerman | Pending | Pending content review. | — | No | — |
+| 99 | Video 1: Asking for Technical Help at the Computer Service Desk in German | Watch how to ask a technician for help with a slow computer in German. Talkivana — Real Conversations. #LearnGerman #GermanConversation #BeginnerGerman | Pending | Pending content review. | — | No | — |
+| 100 | Video 2: Dropping Off Winter Garments at the Dry Cleaner in German | Watch how to drop off a winter jacket at a dry cleaner in German. Talkivana — Real Conversations. #LearnGerman #GermanConversation #BeginnerGerman | Pending | Pending content review. | — | No | — |
