@@ -12,6 +12,7 @@ from language_video_automation.renderer import (
     NarrationSegment,
     TestToneSpeechProvider,
     _fit_duration,
+    _is_removable_tutor_cue,
     _select_visual_style,
     _synthesize_cached,
     build_asset_timeline,
@@ -308,6 +309,86 @@ class RendererTimelineTests(unittest.TestCase):
         self.assertTrue(changed_tutors)
         self.assertEqual(fitted[2][0], german)
         self.assertEqual(fitted[2][2], 275.0)
+        self.assertLessEqual(
+            sum(duration + segment.pause_seconds for segment, _, duration in fitted),
+            330.0,
+        )
+
+    def test_overlength_fit_prunes_only_redundant_tutor_cues_as_last_resort(self):
+        tutor_segments = [
+            NarrationSegment(
+                eyebrow=f"LESSON {index} OF 2 • TUTOR",
+                title="Tutor",
+                body="Guidance",
+                transcript=(
+                    "This deliberately long generic tutor instruction is safe to shorten "
+                    "or remove when the natural voice render exceeds the duration ceiling."
+                ),
+                spoken_language="English",
+                pause_seconds=0.1,
+                accent="primary",
+                display_mode="lesson",
+                cue_text=("TUTOR GUIDANCE" if index % 2 else "GET READY TO REPEAT"),
+            )
+            for index in range(1, 5)
+        ]
+        english_meaning = NarrationSegment(
+            eyebrow="LESSON 1 OF 2 • SPEAKER A",
+            title="Where is the station?",
+            body="English first",
+            transcript="Where is the station?",
+            spoken_language="English",
+            pause_seconds=0.1,
+            accent="primary",
+            display_mode="lesson",
+            cue_text="LISTEN",
+        )
+        german = NarrationSegment(
+            eyebrow="LESSON 1 OF 2 • REPEAT",
+            title="Wo ist der Bahnhof?",
+            body="Repeat aloud",
+            transcript="Wo ist der Bahnhof?",
+            spoken_language="German",
+            pause_seconds=0.1,
+            accent="secondary",
+            display_mode="lesson",
+            cue_text="REPEAT ALOUD",
+        )
+        resolved = [
+            *((segment, Path(f"tutor-{index}.wav"), 10.0)
+              for index, segment in enumerate(tutor_segments)),
+            (english_meaning, Path("english.wav"), 27.0),
+            (german, Path("german.wav"), 300.0),
+        ]
+
+        with tempfile.TemporaryDirectory() as temporary:
+            fitted = _fit_duration(
+                resolved,
+                asset={"asset_id": "long-1"},
+                kind="long",
+                speech=TestToneSpeechProvider(),
+                audio_dir=Path(temporary),
+                cache={},
+                minimum=270.0,
+                target=300.0,
+                maximum=330.0,
+                max_practice_pause=6.0,
+            )
+
+        fitted_segments = [segment for segment, _, _ in fitted]
+        self.assertIn(english_meaning, fitted_segments)
+        self.assertIn(german, fitted_segments)
+        self.assertLess(
+            sum(_is_removable_tutor_cue(segment) for segment in fitted_segments),
+            len(tutor_segments),
+        )
+        self.assertGreaterEqual(
+            sum(
+                segment.cue_text == "GET READY TO REPEAT"
+                for segment in fitted_segments
+            ),
+            1,
+        )
         self.assertLessEqual(
             sum(duration + segment.pause_seconds for segment, _, duration in fitted),
             330.0,

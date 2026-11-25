@@ -981,6 +981,58 @@ def _fit_duration(
             if total <= maximum - 0.75:
                 break
 
+    # A naturally slow Chatterbox pass can still exceed the ceiling even after
+    # every generic cue has been shortened.  Long lessons contain two tutor-only
+    # beats per dialogue line: a lead-in before the approved English meaning and
+    # a repeat prompt before the unchanged German repetition.  The lead-ins are
+    # redundant because the English meaning immediately follows them.  Remove
+    # only as many of those generic tutor scenes as are necessary, then (only if
+    # required) remove repeat prompts while retaining at least one.  Approved
+    # English meanings, German speech, German repetitions, checkpoints, and the
+    # final German-only conversation are never candidates.
+    if total > maximum:
+        tutor_indexes = [
+            index
+            for index, (segment, _, _) in enumerate(resolved)
+            if _is_removable_tutor_cue(segment)
+        ]
+        lead_in_indexes = [
+            index
+            for index in tutor_indexes
+            if resolved[index][0].cue_text.upper() == "TUTOR GUIDANCE"
+        ]
+        repeat_indexes = [
+            index
+            for index in tutor_indexes
+            if resolved[index][0].cue_text.upper() == "GET READY TO REPEAT"
+        ]
+        # Remove the longest redundant beats first so the smallest number of
+        # visible tutor scenes changes. Keep one repeat cue for pedagogy.
+        ordered_candidates = sorted(
+            lead_in_indexes,
+            key=lambda index: resolved[index][2] + resolved[index][0].pause_seconds,
+            reverse=True,
+        )
+        ordered_candidates.extend(
+            sorted(
+                repeat_indexes[1:],
+                key=lambda index: resolved[index][2] + resolved[index][0].pause_seconds,
+                reverse=True,
+            )
+        )
+        removed_indexes: set[int] = set()
+        for index in ordered_candidates:
+            segment, _, duration = resolved[index]
+            removed_indexes.add(index)
+            total -= duration + segment.pause_seconds
+            if total <= maximum - 0.75:
+                break
+        if removed_indexes:
+            resolved = [
+                item for index, item in enumerate(resolved)
+                if index not in removed_indexes
+            ]
+
     # Fit the target length by giving the learner intentional response time.
     # Never append duplicate lesson material after the German-only conversation.
     if total < target:
@@ -1032,18 +1084,31 @@ def _compact_tutor_transcript(segment: NarrationSegment) -> str | None:
     eyebrow = segment.eyebrow.upper()
     cue = segment.cue_text.upper()
     if "FULL CONVERSATION" in eyebrow:
-        return "Now hear the full conversation in German."
+        return "Full conversation in German."
     if "CHECKPOINT" in eyebrow:
-        return "Great work. Continue."
+        return "Keep going."
     if "TUTOR" in eyebrow and cue == "GET READY TO REPEAT":
-        return "Listen again, then repeat."
+        return "Repeat."
     if "TUTOR" in eyebrow:
-        return "English meaning."
+        return "Meaning."
     if segment.display_mode == "intro":
+        if "HOW THIS LESSON WORKS" in eyebrow and "English" in segment.body:
+            return "English first."
+        if "HOW THIS LESSON WORKS" in eyebrow:
+            return "German twice. Repeat aloud."
         return "Welcome. Let's begin."
     if segment.display_mode == "conversation_intro":
-        return "Now listen to the conversation."
+        return "Listen."
     return None
+
+
+def _is_removable_tutor_cue(segment: NarrationSegment) -> bool:
+    """Identify only generic tutor-only beats; lesson content is never removable."""
+    return (
+        segment.spoken_language.casefold() != "german"
+        and "TUTOR" in segment.eyebrow.upper()
+        and segment.cue_text.upper() in {"TUTOR GUIDANCE", "GET READY TO REPEAT"}
+    )
 
 
 def _synthesize_cached(
