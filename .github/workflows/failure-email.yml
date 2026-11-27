@@ -1,0 +1,44 @@
+name: Talkivana — failure email
+
+on:
+  workflow_run:
+    workflows:
+      - Talkivana — content generation
+      - Talkivana — production and recovery
+      - Talkivana — audience timing agent
+      - Talkivana — sync video tracker
+      - Talkivana — title uniqueness guard
+      - Talkivana — rejected preview cleanup
+      - Talkivana — generate and apply thumbnails
+      - Talkivana — refresh private metadata
+      - Talkivana — reschedule approved pack
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  email_failure:
+    name: Email one concise failure report
+    if: ${{ contains(fromJSON('["failure","timed_out"]'), github.event.workflow_run.conclusion) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Send the failed job and reason by email
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ALERT_SMTP_USERNAME: ${{ secrets.ALERT_SMTP_USERNAME }}
+          ALERT_SMTP_APP_PASSWORD: ${{ secrets.ALERT_SMTP_APP_PASSWORD }}
+          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+        run: >-
+          python scripts/send_failure_email.py
+          --repository "$GITHUB_REPOSITORY"
+          --run-id "${{ github.event.workflow_run.id }}"
+          --run-url "${{ github.event.workflow_run.html_url }}"
+          --workflow "${{ github.event.workflow_run.name }}"
+          --branch "${{ github.event.workflow_run.head_branch }}"
+          --attempt "${{ github.event.workflow_run.run_attempt }}"

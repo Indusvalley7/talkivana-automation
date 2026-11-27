@@ -20,9 +20,9 @@ class GitHubAPIError(RuntimeError):
 
 LABELS: dict[str, tuple[str, str]] = {
     "talkivana": ("17233c", "Managed Talkivana automation"),
-    "pack-awaiting-content": ("d99a2b", "Waiting for content approval"),
+    "pack-awaiting-content": ("d99a2b", "Validated pack queued for production or manual review"),
     "pack-producing": ("168c82", "Voice, visuals, and assembly in progress"),
-    "pack-awaiting-video": ("f47764", "Waiting for final-video approval"),
+    "pack-awaiting-video": ("f47764", "Private files awaiting finalization or manual review"),
     "pack-sample-approved": ("1d76db", "Controlled sample accepted; nothing scheduled"),
     "pack-scheduled": ("0e8a16", "Approved and scheduled"),
     "pack-rejected": ("6e7781", "Rejected by the owner"),
@@ -110,7 +110,9 @@ class GitHubClient:
             if self._request("GET", f"/labels/{encoded}", allow_404=True) is None:
                 self._request("POST", "/labels", {"name": name, "color": color, "description": description})
 
-    def create_issue(self, *, title: str, body: str, labels: list[str], assignee: str) -> Issue:
+    def create_issue(
+        self, *, title: str, body: str, labels: list[str], assignee: str = ""
+    ) -> Issue:
         payload: dict[str, Any] = {"title": title, "body": body, "labels": labels}
         if assignee:
             payload["assignees"] = [assignee]
@@ -237,10 +239,11 @@ def format_issue_body(record: ContentPackRecord) -> str:
     )
     machine_json = json.dumps(record.as_dict(), ensure_ascii=False, sort_keys=True)
     sections_text = "\n\n".join(sections)
-    return f"""## Daily content review sheet
+    return f"""## Daily automated pack record
 
-This Issue is the temporary approval file. Review the numbered lines below and reply here;
-you do not need to return to the Codex chat. Put one command on the first non-empty line:
+This Issue is the durable content, production, and publishing audit record. When unattended mode
+is enabled, a valid pack continues automatically and no reply is required. For an exceptional
+manual correction or recovery, put one command on the first non-empty line:
 
 - `APPROVE CONTENT`
 - `REVISE CONTENT` followed by correction bullets on the next lines
@@ -254,8 +257,8 @@ REVISE CONTENT
 - short-2, word 2: use "..." instead
 ```
 
-Approval generates four videos and uploads them **privately** for full review. It does not
-schedule or publish anything.
+Manual commands are owner-only. The unattended path still uploads **privately** first and schedules
+only after content, history, voice, visual, assembly, manifest, thumbnail, and technical QA pass.
 
 **Pack:** {pack['pack_title']}  
 **Language:** {pack['target_language']} — {pack['language_variety']}  

@@ -57,7 +57,7 @@
           </tbody></table>
           <div class="split-panel" style="margin-top:18px">
             <article class="info-card"><span class="pill good">NORMAL PATH</span><h3>Three calls per pack</h3><p>One daily pack normally needs three structured Gemini responses. The four lessons are generated together; it is not one paid call for every sentence, slide, or voice line.</p></article>
-            <article class="info-card"><span class="pill warn">FAIL-CLOSED PATH</span><h3>Eight attempts maximum</h3><p><code>max_generation_requests_per_run</code> is set to eight. If Gemini is slow, returns invalid output, reaches a project limit, or remains unavailable after retries, the workflow fails before creating an approval issue.</p></article>
+            <article class="info-card"><span class="pill warn">FAIL-CLOSED PATH</span><h3>Eight attempts maximum</h3><p><code>max_generation_requests_per_run</code> is set to eight. If Gemini is slow, returns invalid output, reaches a project limit, or remains unavailable after retries, production stops and the failed workflow triggers an email.</p></article>
           </div>
         </section>
 
@@ -80,7 +80,7 @@
             <article class="info-card"><span class="number">DAILY RESET</span><h3>Quotas replenish</h3><p>Gemini request-per-day limits and YouTube daily quota reset rather than accumulating forever. Reset timing and active limits are provider-controlled.</p></article>
             <article class="info-card"><span class="number">PUBLIC REPO</span><h3>Compute is not metered by minutes</h3><p>The workflows use standard Linux runners in a public repository, not paid larger runners.</p></article>
             <article class="info-card"><span class="number">NO AUTO-UPGRADE</span><h3>A failure cannot create a surprise bill</h3><p>The workflow has no logic that enables billing, purchases quota, or silently selects a paid service.</p></article>
-            <article class="info-card"><span class="number">VISIBLE STOP</span><h3>Limits become workflow errors</h3><p>A missing approval request usually means an upstream job failed or was skipped; it does not mean the system spent money to continue elsewhere.</p></article>
+            <article class="info-card"><span class="number">VISIBLE STOP</span><h3>Limits become workflow errors</h3><p>A provider limit becomes a failed job and concise email; it does not mean the system spent money to continue elsewhere.</p></article>
           </div>
         </section>
 

@@ -36,8 +36,12 @@ from .renderer import (
 )
 from .scheduling import build_timing_plan
 from .thumbnails import DESIGN_VERSION, build_thumbnail_plan, render_youtube_thumbnail
-from .titles import find_title_collisions, validate_unique_titles
-from .topic_history import content_topic_entries, load_excel_video_history
+from .titles import content_titles, find_title_collisions, validate_unique_titles
+from .topic_history import (
+    content_topic_entries,
+    load_excel_video_history,
+    validate_unique_topics,
+)
 from .youtube import YouTubeUploader
 
 
@@ -99,7 +103,7 @@ def create_daily_draft(*, repository: str, force: bool = False) -> Issue | None:
         today=today,
     )
     issue = _create_pack_issue(github, config, record)
-    print(f"Created content approval Issue #{issue.number}: {issue.html_url}")
+    print(f"Created automated pack Issue #{issue.number}: {issue.html_url}")
     return issue
 
 
@@ -142,7 +146,13 @@ def process_approval_event(*, event_path: Path, repository: str) -> None:
     print(f"Issue #{issue.number} is not at an approval gate; stale command ignored.")
 
 
-def prepare_production_event(*, event_path: Path, repository: str, output_path: Path) -> None:
+def prepare_production_event(
+    *,
+    event_path: Path,
+    repository: str,
+    output_path: Path,
+    automatic: bool = False,
+) -> None:
     """Authorize a rendering command and persist an immutable descriptor for downstream jobs."""
     event = json.loads(event_path.read_text(encoding="utf-8"))
     command = parse_approval_command(str(event.get("comment", {}).get("body", "")))
@@ -190,12 +200,45 @@ def prepare_production_event(*, event_path: Path, repository: str, output_path: 
         raise PipelineError(f"Missing repository secrets: {', '.join(missing)}")
     record = parse_pack_record(issue.body)
     _validate_record_again(record, config)
+    if command.decision is Decision.APPROVE_CONTENT:
+        # Re-read the authoritative repository history immediately before expensive media work.
+        # This closes the race between daily generation and unattended production: a pack that
+        # became stale while another run uploaded a similar topic or title must fail closed.
+        issues = github.list_issues(state="all", labels=["talkivana"])
+        other_history = _history_from_issues(
+            [candidate for candidate in issues if candidate.number != issue.number]
+        )
+        validate_unique_topics(
+            record.content,
+            existing_topics=_existing_topic_history(
+                other_history,
+                exclude_titles=content_titles(record.content),
+            ),
+        )
+        validate_unique_titles(
+            record.content,
+            reserved_titles=_uploaded_titles_from_issues(
+                issues,
+                exclude_issue_number=issue.number,
+            ),
+        )
     if resume_existing:
         asset_ids = _missing_production_asset_ids(read_upload_manifest(issue.body))
         if not asset_ids:
             raise PipelineError(
                 f"Issue #{issue.number} already has a complete four-video private manifest."
             )
+    elif automatic:
+        github.comment(
+            issue.number,
+            "Automated content and history QA passed. Voice, visual, assembly, and technical-QA "
+            f"jobs have started for {', '.join(asset_ids)}. "
+            + (
+                "Controlled dry-run output will remain a GitHub artifact and will not be uploaded."
+                if len(asset_ids) == 1
+                else "Uploads remain private until the automatic finalization checks pass."
+            ),
+        )
     else:
         asset_ids = _production_asset_ids(config)
     github.update_issue(issue.number, labels=["talkivana", "pack-producing"])
@@ -232,11 +275,44 @@ def prepare_production_event(*, event_path: Path, repository: str, output_path: 
         "replace_existing": replace_existing,
         "resume_existing": resume_existing,
         "dry_run": len(asset_ids) == 1 and not resume_existing,
+        "automatic": automatic,
         "asset_ids": list(asset_ids),
         "record": record.as_dict(),
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(descriptor, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def prepare_automatic_production(
+    *, issue_number: int, repository: str, output_path: Path
+) -> None:
+    """Freeze a generated pack for trusted unattended production.
+
+    The synthetic event deliberately passes through the same configured-owner authorization,
+    content-integrity checks, title checks, secret checks, and immutable descriptor creation as a
+    manual ``APPROVE CONTENT`` command. The workflow, not an external caller, supplies the Issue.
+    """
+    config = load_config(require_enabled=True)
+    synthetic_event = output_path.parent / "automatic-approval-event.json"
+    synthetic_event.parent.mkdir(parents=True, exist_ok=True)
+    synthetic_event.write_text(
+        json.dumps(
+            {
+                "comment": {"body": "APPROVE CONTENT"},
+                "issue": {"number": int(issue_number)},
+                "sender": {"login": config.approver_login},
+            },
+            indent=2,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    prepare_production_event(
+        event_path=synthetic_event,
+        repository=repository,
+        output_path=output_path,
+        automatic=True,
+    )
 
 
 def _production_gate_for_command(
@@ -519,22 +595,57 @@ def publish_production_previews(
         for asset_id, value in sorted(existing_assets.items())
     )
     run_url = f"https://github.com/{repository}/actions/runs/{os.environ.get('GITHUB_RUN_ID', '')}"
-    github.comment(
-        issue_number,
-        "## Final-video approval required\n\n"
-        "Watch every full private video while signed into the Talkivana channel account:\n\n"
-        f"{links}\n\n"
-        f"Thirty-second convenience clips and generated thumbnails are attached to "
-        f"[{run_url}]({run_url}) for three days.\n\n"
-        "Reply with `APPROVE VIDEO`, `RETRY VOICE: correction`, "
-        "`RETRY VISUALS: correction`, `RETRY VIDEO: correction`, or `REJECT: reason`.\n\n"
-        "Nothing is scheduled or public yet.",
-    )
+    if bool(descriptor.get("automatic", False)):
+        github.comment(
+            issue_number,
+            "## Automated production QA passed\n\n"
+            f"All four private uploads and thumbnails were verified:\n\n{links}\n\n"
+            "The automatic scheduler will now assign the configured four-slot conveyor. "
+            "No human video approval is required.",
+        )
+    else:
+        github.comment(
+            issue_number,
+            "## Final-video approval required\n\n"
+            "Watch every full private video while signed into the Talkivana channel account:\n\n"
+            f"{links}\n\n"
+            f"Thirty-second convenience clips and generated thumbnails are attached to "
+            f"[{run_url}]({run_url}) for three days.\n\n"
+            "Reply with `APPROVE VIDEO`, `RETRY VOICE: correction`, "
+            "`RETRY VISUALS: correction`, `RETRY VIDEO: correction`, or `REJECT: reason`.\n\n"
+            "Nothing is scheduled or public yet.",
+        )
 
 
-def report_production_failure(*, event_path: Path, repository: str) -> None:
-    event = json.loads(event_path.read_text(encoding="utf-8"))
-    issue_number = int(event["issue"]["number"])
+def finalize_automatic_production(*, job_path: Path, repository: str) -> None:
+    """Schedule the exact private files only after every automatic QA stage passes."""
+    descriptor, record, config = _load_production_descriptor(job_path)
+    if not bool(descriptor.get("automatic", False)):
+        raise PipelineError("Automatic finalization requires an automatic production descriptor.")
+    if str(descriptor["repository"]) != repository:
+        raise PipelineError("Production descriptor repository does not match the workflow repository.")
+    if bool(descriptor.get("dry_run", False)):
+        raise PipelineError("A controlled dry run cannot be finalized automatically.")
+    github = GitHubClient(repository)
+    issue = github.get_issue(int(descriptor["issue_number"]))
+    if "pack-awaiting-video" not in issue.labels:
+        raise PipelineError(
+            f"Issue #{issue.number} is not holding four QA-verified private uploads."
+        )
+    _schedule_approved_pack(github, config, issue, record)
+
+
+def report_production_failure(
+    *,
+    repository: str,
+    event_path: Path | None = None,
+    issue_number: int | None = None,
+) -> None:
+    if issue_number is None:
+        if event_path is None:
+            raise PipelineError("Production failure reporting requires an event or Issue number.")
+        event = json.loads(event_path.read_text(encoding="utf-8"))
+        issue_number = int(event["issue"]["number"])
     github = GitHubClient(repository)
     issue = github.get_issue(issue_number)
     labels = ["talkivana", "pack-failed"]
@@ -709,10 +820,9 @@ def _generate_record(
 
 def _create_pack_issue(github: GitHubClient, config: AppConfig, record: ContentPackRecord) -> Issue:
     return github.create_issue(
-        title=f"Talkivana content approval: {record.content['pack_title']} [{record.pack_id}]"[:250],
+        title=f"Talkivana automated pack: {record.content['pack_title']} [{record.pack_id}]"[:250],
         body=format_issue_body(record),
         labels=["talkivana", "pack-awaiting-content"],
-        assignee=config.approver_login,
     )
 
 
@@ -1539,11 +1649,24 @@ def _uploaded_titles_from_issues(
     return list(dict.fromkeys(titles))
 
 
-def _existing_topic_history(history: list[ContentPackRecord]) -> list[str]:
+def _existing_topic_history(
+    history: list[ContentPackRecord],
+    *,
+    exclude_titles: list[str] | tuple[str, ...] = (),
+) -> list[str]:
     """Check the Excel registry every run, then supplement it with current Issue history."""
+    excluded = {str(title).strip().casefold() for title in exclude_titles if str(title).strip()}
     workbook_entries = load_excel_video_history(
         project_root() / "tracker" / "publishing_schedule.xlsx"
     )
+    if excluded:
+        # The hourly tracker can race with automatic production and already contain this pack's
+        # own headings. Exclude exact current titles while retaining every prior/similar heading.
+        workbook_entries = [
+            entry
+            for entry in workbook_entries
+            if entry.split(":", 1)[-1].strip().casefold() not in excluded
+        ]
     issue_entries = [
         entry
         for record in history

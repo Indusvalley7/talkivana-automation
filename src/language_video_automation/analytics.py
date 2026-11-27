@@ -247,7 +247,7 @@ def _format_control_body(data: dict[str, Any]) -> str:
     return f"""# Talkivana Audience Timing Agent
 
 This control page is updated automatically. The agent never publishes videos and cannot bypass
-either approval gate.
+content, media, manifest, or scheduling QA.
 
 **Current stage:** {plan.get('stage', 'waiting')}<br>
 **Experiment day:** {plan.get('day_number', 'waiting')}<br>

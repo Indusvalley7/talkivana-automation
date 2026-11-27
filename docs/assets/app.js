@@ -4,7 +4,7 @@ const pages=[
   ["workflows","02","Workflow atlas","workflows.html","GitHub Actions and observable hand-offs"],
   ["content","03","Lesson studio","content-studio.html","German pedagogy and content contracts"],
   ["media","04","Media engine","media-engine.html","Chatterbox voice, visuals, thumbnails, and assembly"],
-  ["approvals","05","Approval & publishing","approvals.html","Commands, retries, states, and schedule policy"],
+  ["approvals","05","QA & publishing","approvals.html","Automatic gates, recovery commands, states, and schedule policy"],
   ["limits","06","Costs & limits","limits.html","Quotas, throttles, and capacity"],
   ["infrastructure","07","Infrastructure & cost","infrastructure.html","Gemini accounting and the zero-fee stack"],
   ["operations","08","Operator recipes","operations.html","Setup, recovery, and analytics"]

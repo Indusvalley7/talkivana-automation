@@ -1,8 +1,14 @@
-name: Talkivana — approvals and production
+name: Talkivana — production and recovery
 
 on:
   issue_comment:
     types: [created]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Generated Talkivana pack Issue to produce and schedule automatically"
+        required: true
+        type: number
 
 permissions:
   actions: write
@@ -10,17 +16,19 @@ permissions:
   issues: write
 
 concurrency:
-  group: talkivana-approval-${{ github.event.issue.number }}
+  group: talkivana-production-${{ inputs.issue_number || github.event.issue.number }}
   cancel-in-progress: false
 
 jobs:
   command_gate:
     name: Parent agent — authenticate and classify command
-    if: ${{ !github.event.issue.pull_request }}
+    if: ${{ github.event_name == 'workflow_dispatch' || !github.event.issue.pull_request }}
     runs-on: ubuntu-latest
     outputs:
       authorized: ${{ steps.classify.outputs.authorized }}
       decision: ${{ steps.classify.outputs.decision }}
+      issue_number: ${{ steps.classify.outputs.issue_number }}
+      automatic: ${{ steps.classify.outputs.automatic }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,12 +41,24 @@ jobs:
       - id: classify
         name: Classify the first non-empty line
         run: |
-          DECISION="$(python -m language_video_automation classify-event --event "$GITHUB_EVENT_PATH")"
-          AUTHORIZED="$(python -m language_video_automation authorize-event --event "$GITHUB_EVENT_PATH" --repo "$GITHUB_REPOSITORY")"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            DECISION="approve_content"
+            AUTHORIZED="true"
+            ISSUE_NUMBER="${{ inputs.issue_number }}"
+            AUTOMATIC="true"
+          else
+            DECISION="$(python -m language_video_automation classify-event --event "$GITHUB_EVENT_PATH")"
+            AUTHORIZED="$(python -m language_video_automation authorize-event --event "$GITHUB_EVENT_PATH" --repo "$GITHUB_REPOSITORY")"
+            ISSUE_NUMBER="${{ github.event.issue.number }}"
+            AUTOMATIC="false"
+          fi
           echo "decision=$DECISION" >> "$GITHUB_OUTPUT"
           echo "authorized=$AUTHORIZED" >> "$GITHUB_OUTPUT"
+          echo "issue_number=$ISSUE_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "automatic=$AUTOMATIC" >> "$GITHUB_OUTPUT"
           echo "Command category: $DECISION"
           echo "Authorized actor: $AUTHORIZED"
+          echo "Automatic mode: $AUTOMATIC"
 
   direct_command:
     name: Content revision or rejection
@@ -85,11 +105,19 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          python -m language_video_automation production-prepare
-          --event "$GITHUB_EVENT_PATH"
-          --repo "$GITHUB_REPOSITORY"
-          --output build/production/production-job.json
+        run: |
+          if [ "${{ needs.command_gate.outputs.automatic }}" = "true" ]; then
+            python -m language_video_automation production-prepare \
+              --automatic \
+              --issue "${{ needs.command_gate.outputs.issue_number }}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --output build/production/production-job.json
+          else
+            python -m language_video_automation production-prepare \
+              --event "$GITHUB_EVENT_PATH" \
+              --repo "$GITHUB_REPOSITORY" \
+              --output build/production/production-job.json
+          fi
       - id: production_matrix
         name: Expose the immutable asset matrix
         run: |
@@ -263,8 +291,8 @@ jobs:
           compression-level: 0
 
   private_upload:
-    name: Guarded sample/private-video handoff + final approval request
-    needs: [production_prepare, assembly]
+    name: Guarded private upload and automatic scheduling
+    needs: [command_gate, production_prepare, assembly]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -295,11 +323,30 @@ jobs:
           --job build/production/production-job.json
           --input build/assembled
           --repo "$GITHUB_REPOSITORY"
+      - name: Automatically schedule the exact QA-verified private files
+        if: ${{ needs.command_gate.outputs.automatic == 'true' }}
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python -m language_video_automation production-finalize
+          --job build/production/production-job.json
+          --repo "$GITHUB_REPOSITORY"
+      - name: Refresh tracker after automatic scheduling
+        if: ${{ needs.command_gate.outputs.automatic == 'true' }}
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: python -m language_video_automation sync-tracker --repo "$GITHUB_REPOSITORY"
       - name: Attach the full controlled sample
         if: ${{ needs.production_prepare.outputs.dry_run == 'true' }}
         uses: actions/upload-artifact@v4
         with:
-          name: talkivana-full-controlled-sample-${{ github.event.issue.number }}
+          name: talkivana-full-controlled-sample-${{ needs.command_gate.outputs.issue_number }}
           path: |
             build/assembled/**/*.mp4
             build/assembled/**/*-thumbnail.jpg
@@ -309,7 +356,7 @@ jobs:
       - name: Attach 30-second convenience previews
         uses: actions/upload-artifact@v4
         with:
-          name: talkivana-30-second-previews-${{ github.event.issue.number }}
+          name: talkivana-30-second-previews-${{ needs.command_gate.outputs.issue_number }}
           path: |
             build/assembled/**/*-preview.mp4
             build/assembled/**/*-thumbnail.jpg
@@ -335,10 +382,16 @@ jobs:
       - name: Mark the pack failed without publishing anything
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          python -m language_video_automation production-failure
-          --event "$GITHUB_EVENT_PATH"
-          --repo "$GITHUB_REPOSITORY"
+        run: |
+          if [ "${{ needs.command_gate.outputs.automatic }}" = "true" ]; then
+            python -m language_video_automation production-failure \
+              --issue "${{ needs.command_gate.outputs.issue_number }}" \
+              --repo "$GITHUB_REPOSITORY"
+          else
+            python -m language_video_automation production-failure \
+              --event "$GITHUB_EVENT_PATH" \
+              --repo "$GITHUB_REPOSITORY"
+          fi
 
   artifact_cleanup:
     name: Cleanup controller — remove full intermediate artifacts

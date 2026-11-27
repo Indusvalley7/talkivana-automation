@@ -28,6 +28,30 @@ class WorkflowSafetyTests(unittest.TestCase):
         self.assertIn("*-thumbnail.jpg", text)
         self.assertEqual(text.count('"resume_video"'), 3)
 
+    def test_daily_generation_dispatches_unattended_production_only_when_enabled(self):
+        text = (
+            project_root() / ".github" / "workflows" / "generate-draft.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("TALKIVANA_UNATTENDED_AUTOMATION == 'true'", text)
+        self.assertIn("gh workflow run process-approval.yml", text)
+        self.assertIn('--field "issue_number=$ISSUE_NUMBER"', text)
+
+    def test_unattended_production_uses_the_same_qa_pipeline_then_finalizes(self):
+        text = (
+            project_root() / ".github" / "workflows" / "process-approval.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("production-prepare \\\n              --automatic", text)
+        self.assertIn("production-finalize", text)
+        self.assertIn("Automatically schedule the exact QA-verified private files", text)
+
+    def test_failure_email_is_failure_only_and_has_no_success_trigger(self):
+        text = (
+            project_root() / ".github" / "workflows" / "failure-email.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("'[\"failure\",\"timed_out\"]'", text)
+        self.assertNotIn("conclusion == 'success'", text)
+        self.assertIn("scripts/send_failure_email.py", text)
+
     def test_voice_generation_retries_from_segment_checkpoints(self):
         text = (
             project_root() / ".github" / "workflows" / "process-approval.yml"

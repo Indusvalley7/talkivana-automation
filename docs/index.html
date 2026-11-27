@@ -47,7 +47,7 @@
       </section>
 
       <section class="metric-ribbon reveal" aria-label="System guarantees">
-        <article><strong>2</strong><span>human approval gates</span></article>
+        <article><strong>0</strong><span>daily approval chores</span></article>
         <article><strong>4</strong><span>separate publish slots</span></article>
         <article><strong>7</strong><span>maximum pending packs</span></article>
         <article><strong>0</strong><span>unapproved public uploads</span></article>
@@ -60,9 +60,9 @@
         </div>
         <div class="system-line" aria-label="Automation sequence">
           <a class="system-node" href="content-studio.html"><span>01</span><strong>Content</strong><small>Gemini + tutor profile</small></a>
-          <a class="system-node" href="approvals.html"><span>02</span><strong>Gate one</strong><small>Content approval</small></a>
+          <a class="system-node" href="approvals.html"><span>02</span><strong>Validate</strong><small>Language + history QA</small></a>
           <a class="system-node" href="media-engine.html"><span>03</span><strong>Media</strong><small>Voice, visuals, assembly</small></a>
-          <a class="system-node" href="approvals.html"><span>04</span><strong>Gate two</strong><small>Exact-video approval</small></a>
+          <a class="system-node" href="approvals.html"><span>04</span><strong>Verify</strong><small>Exact-file technical QA</small></a>
           <a class="system-node" href="workflows.html"><span>05</span><strong>Publish</strong><small>Private → scheduled</small></a>
           <a class="system-node" href="operations.html"><span>06</span><strong>Observe</strong><small>24 h + 7 d analytics</small></a>
           <a class="system-node" href="operations.html"><span>07</span><strong>Improve</strong><small>Timing experiment</small></a>
@@ -76,7 +76,7 @@
           <a class="chapter-card tone-coral" href="workflows.html"><span class="chapter-number">02</span><span class="chapter-icon">↻</span><h3>Workflow atlas</h3><p>Every GitHub Action, its trigger, hand-off, artifact, and failure behavior.</p><span class="card-link">Trace a run →</span></a>
           <a class="chapter-card tone-gold" href="content-studio.html"><span class="chapter-number">03</span><span class="chapter-icon">Aa</span><h3>Lesson studio</h3><p>The German teaching recipe, validation rules, and format contracts.</p><span class="card-link">Read the pedagogy →</span></a>
           <a class="chapter-card tone-blue" href="media-engine.html"><span class="chapter-number">04</span><span class="chapter-icon">◉</span><h3>Media engine</h3><p>Chatterbox voices, timing, templates, thumbnails, and FFmpeg assembly.</p><span class="card-link">Inspect the pipeline →</span></a>
-          <a class="chapter-card tone-berry" href="approvals.html"><span class="chapter-number">05</span><span class="chapter-icon">✓</span><h3>Approval & publishing</h3><p>Owner commands, state transitions, scheduling, and catch-up policy.</p><span class="card-link">Operate the gates →</span></a>
+          <a class="chapter-card tone-berry" href="approvals.html"><span class="chapter-number">05</span><span class="chapter-icon">✓</span><h3>QA & publishing</h3><p>Automatic gates, recovery commands, scheduling, and catch-up policy.</p><span class="card-link">Inspect the controls →</span></a>
           <a class="chapter-card tone-slate" href="limits.html"><span class="chapter-number">06</span><span class="chapter-icon">∞</span><h3>Costs & limits</h3><p>What is free, what is quota-bound, and where throttles appear.</p><span class="card-link">Know the ceilings →</span></a>
           <a class="chapter-card tone-gold" href="infrastructure.html"><span class="chapter-number">07</span><span class="chapter-icon">₹0</span><h3>Infrastructure & cost</h3><p>Gemini request accounting, open-source media, public compute, and why the normal path has no mandatory fee.</p><span class="card-link">Trace the cost stack →</span></a>
           <a class="chapter-card tone-moss" href="operations.html"><span class="chapter-number">08</span><span class="chapter-icon">+</span><h3>Operator recipes</h3><p>Setup, recovery, retries, emergency stops, retention, and tracking.</p><span class="card-link">Open the runbook →</span></a>
@@ -86,7 +86,7 @@
       <section class="section-block two-column reveal" data-search-section>
         <article class="feature-panel">
           <p class="eyebrow">Control philosophy</p><h2>Automate the labour.<br>Keep the judgement.</h2>
-          <p>The system may draft, validate, synthesize, render, upload privately, and recommend a time. Only the repository owner can approve the content and the exact finished video.</p>
+          <p>The system drafts, validates, synthesizes, renders, uploads privately, and schedules only after every machine-checkable gate passes. The owner is contacted by email only when it stops.</p>
           <div class="rule-stack">
             <div><span>01</span><p><strong>Fail closed.</strong> Missing credentials, invalid German, broken audio, or incomplete uploads stop progress.</p></div>
             <div><span>02</span><p><strong>Resume precisely.</strong> Manifests and issue labels preserve completed work and prevent duplicate uploads.</p></div>
@@ -94,9 +94,9 @@
           </div>
         </article>
         <aside class="command-card">
-          <div class="terminal-top"><span></span><span></span><span></span><small>approval-console</small></div>
+          <div class="terminal-top"><span></span><span></span><span></span><small>recovery-console</small></div>
           <div class="terminal-body">
-            <p class="comment"># First line controls the workflow</p>
+            <p class="comment"># Optional owner-only recovery commands</p>
             <button class="copy-line" data-copy="APPROVE CONTENT"><code>APPROVE CONTENT</code><span>copy</span></button>
             <button class="copy-line" data-copy="APPROVE VIDEO"><code>APPROVE VIDEO</code><span>copy</span></button>
             <button class="copy-line" data-copy="RETRY VOICE: describe the correction"><code>RETRY VOICE: …</code><span>copy</span></button>

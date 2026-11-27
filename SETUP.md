@@ -22,7 +22,9 @@ token is not required for this system.
 | `YOUTUBE_CLIENT_SECRET` | Yes | Private upload, thumbnails, scheduling, and analytics |
 | `YOUTUBE_REFRESH_TOKEN` | Yes | Long-running YouTube authorization without daily sign-in |
 | German YouTube playlist ID | No | Routes uploads into the German playlist |
-| GitHub email notification setting | No | Sends approval and failure notices from GitHub |
+| `ALERT_SMTP_USERNAME` | Yes | Gmail address that sends failure-only alerts |
+| `ALERT_SMTP_APP_PASSWORD` | Yes | Gmail App Password used only by the failure mailer |
+| `ALERT_EMAIL_TO` | Yes | Address that receives a concise failure report |
 
 Do not paste secret values into an Issue, commit, or chat. Enter them directly in GitHub Actions
 secrets, or use the local helper below. Chatterbox uses its public open-source model and the
@@ -144,12 +146,22 @@ When the browser opens:
 
 Do not manually send the downloaded JSON or refresh token through chat or email.
 
-## 5. Enable notifications
+## 5. Configure failure-only email
 
-Watch the repository with **All Activity** and enable email notifications for assigned Issues.
-Email replies become Issue comments only when GitHub email reply handling is available. The
-GitHub Issue remains the authoritative approval surface. No email password or SMTP credential is
-required because these messages are GitHub notifications, not mail sent by Talkivana itself.
+Use a Gmail App Password; never store the normal Google password. On the sending Google account,
+enable 2-Step Verification, open **Google Account → Security → App passwords**, create an app
+password named `Talkivana GitHub`, and copy the 16-character value once.
+
+In **GitHub → Settings → Secrets and variables → Actions → New repository secret**, add:
+
+- `ALERT_SMTP_USERNAME`: the full sending Gmail address.
+- `ALERT_SMTP_APP_PASSWORD`: the generated App Password (spaces may be omitted).
+- `ALERT_EMAIL_TO`: the address that should receive failure reports; it may be the same address.
+
+The mail workflow runs only when a monitored operational workflow concludes with `failure`. It
+extracts the failed job and best available error reason and includes the Actions link. It has no
+success branch. To avoid routine GitHub mail, change repository Watch from **All Activity** to
+**Participating and @mentions**; automated pack Issues are not assigned to you.
 
 ## 6. Test while locked
 
@@ -184,3 +196,11 @@ operation. This workflow changes thumbnails only and retains a seven-day audit a
 Only after this sequence should the required repository variables be enabled. Content generation,
 analytics collection, tracker refresh, and rejected-preview deletion have separate switches so one
 schedule can be activated without silently activating the others.
+
+## 8. Enable unattended production
+
+After the failure-email secrets are saved and the manual dry run has passed, create the repository
+variable `TALKIVANA_UNATTENDED_AUTOMATION` with value `true`. A valid daily pack will then move
+through voice, visuals, assembly, private upload, technical QA, scheduling, and tracker refresh
+without content or video approval comments. Leave this variable unset to keep automatic production
+off while retaining all manual recovery commands.
